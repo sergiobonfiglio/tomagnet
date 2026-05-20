@@ -1,0 +1,12 @@
+default_timeout_seconds: 15
+concurrency: 4
+# Used by default/auto selection.
+disabled_indexers:
+  - thepiratebay
+indexers:
+  - id: "yts"
+    # Optional. "auto" tries cached base URL first, then definition links.
+    base_url: "auto"
+  - id: "1337x"
+    timeout_seconds: 10
+    base_url: "https://1337x.to/"

@@ -1,0 +1,16 @@
+# Local config and secrets
+/tomagnet.yaml
+/*.local.yaml
+/.env
+
+# Build artifacts
+/tomagnet
+/bin/
+
+# Generated reports and agent state
+/reports/
+/.ralph/
+
+# OS/editor noise
+.DS_Store
+.vscode/
