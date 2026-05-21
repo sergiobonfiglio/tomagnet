@@ -2,13 +2,14 @@
 /tomagnet.yaml
 /*.local.yaml
 /.env
+/.tomagnet/
 
 # Build artifacts
 /tomagnet
 /bin/
 
 # Generated reports and agent state
-/reports/
+/reports
 /.ralph/
 
 # OS/editor noise

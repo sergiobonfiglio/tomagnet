@@ -13,7 +13,7 @@ func Run(ctx context.Context, w io.Writer, indexers []config.Indexer, debug func
 	passed := 0
 	for _, idx := range indexers {
 		ok := false
-		for _, q := range []string{"dune", "severance s01e01"} {
+		for _, q := range []string{"dune", "simpsons s01e01"} {
 			r := search.Run(ctx, search.Options{Query: q, Indexers: []config.Indexer{idx}, Limit: 1, Concurrency: 1, Debug: debug})
 			if len(r.Errors) == 0 {
 				ok = true

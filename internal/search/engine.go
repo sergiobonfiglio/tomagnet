@@ -14,14 +14,14 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/tidwall/gjson"
-	"golang.org/x/net/html"
-	"golang.org/x/text/encoding/htmlindex"
 	"github.com/sergiobonfiglio/tomagnet/internal/cardigann"
 	"github.com/sergiobonfiglio/tomagnet/internal/config"
 	"github.com/sergiobonfiglio/tomagnet/internal/definitions"
 	"github.com/sergiobonfiglio/tomagnet/internal/fetch"
 	"github.com/sergiobonfiglio/tomagnet/internal/normalize"
+	"github.com/tidwall/gjson"
+	"golang.org/x/net/html"
+	"golang.org/x/text/encoding/htmlindex"
 )
 
 type Options struct {

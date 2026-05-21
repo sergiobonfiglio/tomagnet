@@ -85,9 +85,9 @@ func Search(ctx context.Context, opt SearchOptions) Response {
 		out.Results = append(out.Results, Result{
 			Title:       value(res.Title),
 			Indexer:     res.Indexer,
-			SizeBytes:   int64Value(res.Size),
-			Seeders:     intValue(res.Seeders),
-			Leechers:    intValue(res.Leechers),
+			SizeBytes:   value(res.Size),
+			Seeders:     value(res.Seeders),
+			Leechers:    value(res.Leechers),
 			PublishedAt: res.PublishDate,
 			Category:    value(res.Category),
 			MagnetURL:   value(res.MagnetURL),
@@ -103,23 +103,10 @@ func Search(ctx context.Context, opt SearchOptions) Response {
 	return out
 }
 
-func value(v *string) string {
+func value[T any](v *T) T {
 	if v == nil {
-		return ""
-	}
-	return *v
-}
-
-func intValue(v *int) int {
-	if v == nil {
-		return 0
-	}
-	return *v
-}
-
-func int64Value(v *int64) int64 {
-	if v == nil {
-		return 0
+		var zero T
+		return zero
 	}
 	return *v
 }
