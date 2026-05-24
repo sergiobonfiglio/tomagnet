@@ -38,19 +38,19 @@ func TestSearchUsesInMemoryDefinition(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	definition := &Definition{Raw: map[string]any{
-		"id":       "custom",
-		"name":     "Custom",
-		"base_url": srv.URL,
-		"search": map[string]any{
-			"path": "/",
-			"rows": map[string]any{"selector": "results"},
-			"fields": map[string]any{
-				"title":  map[string]any{"selector": "title"},
-				"magnet": map[string]any{"selector": "magnet"},
+	definition := &Definition{
+		ID:      "custom",
+		Name:    "Custom",
+		BaseURL: srv.URL,
+		Search: SearchDefinition{
+			Path: "/",
+			Rows: RowsDefinition{Selector: "results"},
+			Fields: map[string]FieldDefinition{
+				"title":  {Selector: "title"},
+				"magnet": {Selector: "magnet"},
 			},
 		},
-	}}
+	}
 
 	resp := Search(context.Background(), SearchOptions{
 		Query:    "dune",

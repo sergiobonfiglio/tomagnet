@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0
+
+Breaking change for the Go library definition API.
+
+- Replace the temporary `Definition.Raw map[string]any` API with typed public definition structs.
+- Add `DecodeDefinition(io.Reader)` and `LoadDefinition(path)` so library consumers can reuse tomagnet's definition-file decoder.
+- Keep `Definition *Definition` on `tomagnet.Indexer` for in-memory definitions.
+
 ## 0.2.0
 
 Breaking change for the Go library API.

@@ -9,14 +9,6 @@ import (
 	internalsearch "github.com/sergiobonfiglio/tomagnet/internal/search"
 )
 
-type Definition struct {
-	ID      string
-	Name    string
-	BaseURL string
-	Config  map[string]string
-	Raw     map[string]any
-}
-
 type Indexer struct {
 	ID             string
 	BaseURL        string
@@ -45,29 +37,6 @@ type SearchOptions struct {
 	Limit       int
 	Concurrency int
 	Debug       func(string, ...any)
-}
-
-func (d Definition) cardigann() *cardigann.Definition {
-	cd := cardigann.FromRaw(d.Raw)
-	if d.ID != "" {
-		cd.ID = d.ID
-	}
-	if d.Name != "" {
-		cd.Name = d.Name
-	}
-	if d.BaseURL != "" {
-		cd.BaseURL = d.BaseURL
-	}
-	if d.Config != nil {
-		cd.Config = d.Config
-	}
-	if cd.Config == nil {
-		cd.Config = map[string]string{}
-	}
-	if cd.Config["sitelink"] == "" {
-		cd.Config["sitelink"] = cd.BaseURL
-	}
-	return cd
 }
 
 type Result struct {
