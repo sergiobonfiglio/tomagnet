@@ -15,11 +15,28 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	version = "0.1.0"
+	commit  = ""
+	date    = ""
+)
+
 func main() {
 	if err := root().Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func versionOutput() string {
+	parts := []string{"tomagnet " + version}
+	if commit != "" {
+		parts = append(parts, "commit "+commit)
+	}
+	if date != "" {
+		parts = append(parts, "built "+date)
+	}
+	return strings.Join(parts, "\n")
 }
 
 type modeValue struct{ target *string }
@@ -52,7 +69,8 @@ func root() *cobra.Command {
 		}
 	}
 
-	cmd := &cobra.Command{Use: "tomagnet"}
+	cmd := &cobra.Command{Use: "tomagnet", Version: version}
+	cmd.SetVersionTemplate(versionOutput() + "\n")
 	cmd.PersistentFlags().BoolVar(&debug, "debug", false, "debug logs to stderr")
 
 	var indexers, categories []string

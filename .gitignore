@@ -7,8 +7,9 @@
 # Build artifacts
 /tomagnet
 /bin/
-
-# Generated reports and agent state
+# Generated outputs and agent state
+/coverage.out
+/dist/
 /reports
 /.ralph/
 

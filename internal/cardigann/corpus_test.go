@@ -12,7 +12,7 @@ func TestAllDownloadedDefinitionsUseSupportedFeatures(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(files) == 0 {
-		t.Fatal("no definition files")
+		t.Skip("no synced definition files; run `tomagnet definitions sync` to enable corpus test")
 	}
 	for _, path := range files {
 		path := path

@@ -50,3 +50,13 @@ func TestSearchCommandRejectsUnknownMode(t *testing.T) {
 	}
 	t.Fatal("search command not found")
 }
+
+func TestRootCommandHasVersion(t *testing.T) {
+	cmd := root()
+	if cmd.Version == "" {
+		t.Fatal("expected root command version")
+	}
+	if got, want := versionOutput(), "tomagnet 0.1.0"; got != want {
+		t.Fatalf("versionOutput() = %q, want %q", got, want)
+	}
+}
