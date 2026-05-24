@@ -6,7 +6,7 @@ It can fetch Cardigann/Jackett-style indexer definitions on demand, keep them in
 
 ## Version
 
-Current version: **0.1.0**
+Current version: **0.2.0**
 
 ```bash
 tomagnet --version
@@ -15,7 +15,7 @@ tomagnet --version
 ## Install
 
 ```bash
-go install github.com/sergiobonfiglio/tomagnet/cmd/tomagnet@v0.1.0
+go install github.com/sergiobonfiglio/tomagnet/cmd/tomagnet@v0.2.0
 ```
 
 Or build from a checkout:

@@ -4,14 +4,24 @@ import (
 	"context"
 	"time"
 
+	"github.com/sergiobonfiglio/tomagnet/internal/cardigann"
 	internalconfig "github.com/sergiobonfiglio/tomagnet/internal/config"
 	internalsearch "github.com/sergiobonfiglio/tomagnet/internal/search"
 )
+
+type Definition struct {
+	ID      string
+	Name    string
+	BaseURL string
+	Config  map[string]string
+	Raw     map[string]any
+}
 
 type Indexer struct {
 	ID             string
 	BaseURL        string
 	TimeoutSeconds int
+	Definition     *Definition
 }
 
 type SearchOptions struct {
@@ -35,6 +45,29 @@ type SearchOptions struct {
 	Limit       int
 	Concurrency int
 	Debug       func(string, ...any)
+}
+
+func (d Definition) cardigann() *cardigann.Definition {
+	cd := cardigann.FromRaw(d.Raw)
+	if d.ID != "" {
+		cd.ID = d.ID
+	}
+	if d.Name != "" {
+		cd.Name = d.Name
+	}
+	if d.BaseURL != "" {
+		cd.BaseURL = d.BaseURL
+	}
+	if d.Config != nil {
+		cd.Config = d.Config
+	}
+	if cd.Config == nil {
+		cd.Config = map[string]string{}
+	}
+	if cd.Config["sitelink"] == "" {
+		cd.Config["sitelink"] = cd.BaseURL
+	}
+	return cd
 }
 
 type Result struct {
@@ -75,10 +108,14 @@ type Response struct {
 
 func Search(ctx context.Context, opt SearchOptions) Response {
 	indexers := make([]internalconfig.Indexer, 0, len(opt.Indexers))
+	definitions := map[string]*cardigann.Definition{}
 	for _, idx := range opt.Indexers {
 		indexers = append(indexers, internalconfig.Indexer{ID: idx.ID, BaseURL: idx.BaseURL, TimeoutSeconds: idx.TimeoutSeconds})
+		if idx.Definition != nil {
+			definitions[idx.ID] = idx.Definition.cardigann()
+		}
 	}
-	r := internalsearch.Run(ctx, internalsearch.Options{Query: opt.Query, Mode: opt.Mode, Season: opt.Season, Episode: opt.Episode, IMDBID: opt.IMDBID, TMDBID: opt.TMDBID, TVDBID: opt.TVDBID, DoubanID: opt.DoubanID, TVMazeID: opt.TVMazeID, Artist: opt.Artist, Album: opt.Album, Author: opt.Author, Title: opt.Title, Genre: opt.Genre, Year: opt.Year, Categories: opt.Categories, Indexers: indexers, Limit: opt.Limit, Concurrency: opt.Concurrency, Debug: opt.Debug})
+	r := internalsearch.Run(ctx, internalsearch.Options{Query: opt.Query, Mode: opt.Mode, Season: opt.Season, Episode: opt.Episode, IMDBID: opt.IMDBID, TMDBID: opt.TMDBID, TVDBID: opt.TVDBID, DoubanID: opt.DoubanID, TVMazeID: opt.TVMazeID, Artist: opt.Artist, Album: opt.Album, Author: opt.Author, Title: opt.Title, Genre: opt.Genre, Year: opt.Year, Categories: opt.Categories, Indexers: indexers, Limit: opt.Limit, Concurrency: opt.Concurrency, Definitions: definitions, Debug: opt.Debug})
 	out := Response{Meta: Meta{Query: r.Meta.Query, StartedAt: r.Meta.StartedAt, DurationMS: r.Meta.DurationMS, IndexersRequested: r.Meta.IndexersRequested, IndexersSucceeded: r.Meta.IndexersSucceeded, IndexersFailed: r.Meta.IndexersFailed, TotalResults: r.Meta.TotalResults}}
 	out.Results = make([]Result, 0, len(r.Results))
 	for _, res := range r.Results {

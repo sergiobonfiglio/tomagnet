@@ -61,12 +61,17 @@ func Load(path string) (*Definition, error) {
 			return nil, err
 		}
 	}
-	d := &Definition{Raw: raw, Config: settingDefaults(raw)}
-	d.ID = str(raw["id"])
-	d.Name = str(raw["name"])
+	d := FromRaw(raw)
 	if d.ID == "" {
 		d.ID = strings.TrimSuffix(strings.TrimSuffix(filepath.Base(path), ".yaml"), ".yml")
 	}
+	return d, nil
+}
+
+func FromRaw(raw map[string]any) *Definition {
+	d := &Definition{Raw: raw, Config: settingDefaults(raw)}
+	d.ID = str(raw["id"])
+	d.Name = str(raw["name"])
 	d.BaseURL = firstStr(raw, "base_url", "site", "url")
 	if d.BaseURL == "" {
 		if links := slice(raw["links"]); len(links) > 0 {
@@ -76,7 +81,7 @@ func Load(path string) (*Definition, error) {
 	if d.Config["sitelink"] == "" {
 		d.Config["sitelink"] = d.BaseURL
 	}
-	return d, nil
+	return d
 }
 
 func (d *Definition) Validate() error {

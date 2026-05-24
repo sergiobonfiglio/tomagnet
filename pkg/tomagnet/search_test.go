@@ -1,6 +1,11 @@
 package tomagnet
 
-import "testing"
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
 
 func TestSearchOptionsExposeModeAwareFields(t *testing.T) {
 	opt := SearchOptions{
@@ -23,5 +28,38 @@ func TestSearchOptionsExposeModeAwareFields(t *testing.T) {
 
 	if opt.Mode != "movie-search" || opt.Season != "1" || opt.Episode != "2" || opt.IMDBID != "tt1" || opt.TMDBID != "tm1" || opt.TVDBID != "tv1" || opt.DoubanID != "db1" || opt.TVMazeID != "mz1" || opt.Artist != "art" || opt.Album != "alb" || opt.Author != "auth" || opt.Title != "ttl" || opt.Genre != "gen" || opt.Year != "2024" || len(opt.Categories) != 1 {
 		t.Fatalf("opt=%#v", opt)
+	}
+}
+
+func TestSearchUsesInMemoryDefinition(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"results":[{"title":"Dune","magnet":"magnet:?xt=urn:btih:abc"}]}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	definition := &Definition{Raw: map[string]any{
+		"id":       "custom",
+		"name":     "Custom",
+		"base_url": srv.URL,
+		"search": map[string]any{
+			"path": "/",
+			"rows": map[string]any{"selector": "results"},
+			"fields": map[string]any{
+				"title":  map[string]any{"selector": "title"},
+				"magnet": map[string]any{"selector": "magnet"},
+			},
+		},
+	}}
+
+	resp := Search(context.Background(), SearchOptions{
+		Query:    "dune",
+		Indexers: []Indexer{{ID: "custom", TimeoutSeconds: 5, Definition: definition}},
+	})
+	if len(resp.Errors) > 0 {
+		t.Fatalf("errors: %#v", resp.Errors)
+	}
+	if len(resp.Results) != 1 || resp.Results[0].Title != "Dune" {
+		t.Fatalf("results: %#v", resp.Results)
 	}
 }

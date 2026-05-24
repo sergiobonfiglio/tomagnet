@@ -43,6 +43,7 @@ type Options struct {
 	Categories         []string
 	Indexers           []config.Indexer
 	Limit, Concurrency int
+	Definitions        map[string]*cardigann.Definition
 	Debug              func(string, ...any)
 }
 
@@ -248,14 +249,19 @@ func Run(ctx context.Context, opt Options) Response {
 }
 
 func runOne(ctx context.Context, idx config.Indexer, opt Options) ([]Result, error) {
-	p, err := definitions.Resolve(idx.ID)
-	if err != nil {
-		return nil, fmt.Errorf("resolve: %w", err)
-	}
-	opt.Debug("definition %s %s", idx.ID, p)
-	d, err := cardigann.Load(p)
-	if err != nil {
-		return nil, fmt.Errorf("parse definition: %w", err)
+	d := opt.Definitions[idx.ID]
+	if d == nil {
+		p, err := definitions.Resolve(idx.ID)
+		if err != nil {
+			return nil, fmt.Errorf("resolve: %w", err)
+		}
+		opt.Debug("definition %s %s", idx.ID, p)
+		d, err = cardigann.Load(p)
+		if err != nil {
+			return nil, fmt.Errorf("parse definition: %w", err)
+		}
+	} else {
+		opt.Debug("definition %s in-memory", idx.ID)
 	}
 	if err := d.Validate(); err != nil {
 		return nil, fmt.Errorf("validate: %w", err)
