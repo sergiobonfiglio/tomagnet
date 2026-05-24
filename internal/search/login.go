@@ -39,9 +39,8 @@ func buildLoginRequest(d *cardigann.Definition, page string) cardigann.RequestSp
 		return spec
 	}
 	scope := doc.Selection
-	form := emptySelection(doc.Selection)
 	if formSel != "" {
-		form = selectNodes(doc.Selection, formSel).First()
+		form := selectNodes(doc.Selection, formSel).First()
 		if form.Length() > 0 {
 			scope = form
 			if submitPath == "" {

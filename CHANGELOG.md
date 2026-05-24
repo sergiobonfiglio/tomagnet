@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1
+
+Patch release.
+
+- Remove unused internal `ghItem` type.
+- Remove an unused assignment in login request building.
+- Verify with `staticcheck ./...`, `go test ./...`, and `go vet ./...`.
+
 ## 0.3.0
 
 Breaking change for the Go library definition API.

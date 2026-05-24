@@ -29,10 +29,6 @@ func Resolve(id string) (string, error) {
 	return "", fmt.Errorf("definition not found for %q", id)
 }
 
-type ghItem struct {
-	Name, DownloadURL string `json:"name","download_url"`
-}
-
 func Sync() (Metadata, error) {
 	resp, err := http.Get(apiURL)
 	if err != nil {
