@@ -36,3 +36,13 @@ func TestDownloadBeforeRequestSupportsAbsoluteURIPath(t *testing.T) {
 		t.Fatalf("got %#v", r)
 	}
 }
+
+func TestDownloadBeforeRequestRendersTemplatedMethod(t *testing.T) {
+	d := &Definition{BaseURL: "https://idx.test", Config: map[string]string{}, Raw: map[string]any{"download": map[string]any{"before": map[string]any{
+		"path":   "thanks.php",
+		"method": "{{ if .DownloadUri.Query.id }}post{{ else }}get{{ end }}",
+	}}}}
+	if got := DownloadBeforeRequest(d, "https://idx.test/download.php?id=abc123").Method; got != "post" {
+		t.Fatalf("method = %q, want post", got)
+	}
+}

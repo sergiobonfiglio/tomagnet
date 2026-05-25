@@ -56,7 +56,7 @@ func TestRootCommandHasVersion(t *testing.T) {
 	if cmd.Version == "" {
 		t.Fatal("expected root command version")
 	}
-	if got, want := versionOutput(), "tomagnet 0.3.1"; got != want {
+	if got, want := versionOutput(), "tomagnet "+version; got != want {
 		t.Fatalf("versionOutput() = %q, want %q", got, want)
 	}
 }

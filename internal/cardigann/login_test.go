@@ -14,3 +14,13 @@ func TestLoginRequestRendersPathInputsAndHeaders(t *testing.T) {
 		t.Fatalf("LoginRequest() = %#v", got)
 	}
 }
+
+func TestLoginRequestRendersTemplatedMethod(t *testing.T) {
+	d := &Definition{Config: map[string]string{"use_post": "1"}, Raw: map[string]any{"login": map[string]any{
+		"path":   "/login",
+		"method": "{{ if .Config.use_post }}post{{ else }}get{{ end }}",
+	}}}
+	if got := LoginRequest(d).Method; got != "post" {
+		t.Fatalf("method = %q, want post", got)
+	}
+}

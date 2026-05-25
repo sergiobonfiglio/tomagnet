@@ -1,0 +1,16 @@
+id: 1337x
+name: 1337x
+links:
+  - https://1337x.to/
+caps:
+  modes:
+    search: [q]
+    tv-search: [q, season, ep]
+    movie-search: [q]
+search:
+  path: /sort-search/{{ .Keywords }}/seeders/desc/1/
+  rows:
+    selector: table tbody tr
+  fields:
+    title:
+      selector: a[href*="/torrent/"]

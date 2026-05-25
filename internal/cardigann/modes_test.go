@@ -62,3 +62,18 @@ func TestSearchRequestWithOptionsRendersIMDBIDShort(t *testing.T) {
 		t.Fatalf("inputs=%#v", got.Inputs)
 	}
 }
+
+func TestSearchRequestWithOptionsRendersTemplatedMethod(t *testing.T) {
+	d := &Definition{Config: map[string]string{}, Raw: map[string]any{
+		"search": map[string]any{"paths": []any{map[string]any{
+			"path":   "/search",
+			"method": "{{ if .Keywords }}post{{ else }}get{{ end }}",
+		}}},
+	}}
+	if got := SearchRequestWithOptions(d, SearchOptions{Keywords: "dune"}).Method; got != "post" {
+		t.Fatalf("method = %q, want post", got)
+	}
+	if got := SearchRequestWithOptions(d, SearchOptions{}).Method; got != "get" {
+		t.Fatalf("method = %q, want get", got)
+	}
+}

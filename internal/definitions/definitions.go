@@ -12,11 +12,16 @@ import (
 )
 
 const CacheDir = ".tomagnet/definitions"
-const apiURL = "https://api.github.com/repos/Jackett/Jackett/contents/src/Jackett.Common/Definitions?ref=master"
+
+// UpstreamRef pins Jackett definitions sync to a known-compatible upstream commit.
+const UpstreamRef = "bbd0821c34afbc4c6a1d1b40760247f3bef5f20e"
+
+const apiURL = "https://api.github.com/repos/Jackett/Jackett/contents/src/Jackett.Common/Definitions?ref=" + UpstreamRef
 
 type Metadata struct {
 	SyncedAt  time.Time `json:"synced_at"`
 	SourceURL string    `json:"source_url"`
+	SourceRef string    `json:"source_ref"`
 	Files     []string  `json:"files"`
 }
 
@@ -26,7 +31,7 @@ func Resolve(id string) (string, error) {
 			return p, nil
 		}
 	}
-	return "", fmt.Errorf("definition not found for %q", id)
+	return "", fmt.Errorf("definition not found for %q; run a definitions sync first", id)
 }
 
 func Sync() (Metadata, error) {
@@ -48,7 +53,7 @@ func Sync() (Metadata, error) {
 	if err := os.MkdirAll(CacheDir, 0o755); err != nil {
 		return Metadata{}, err
 	}
-	m := Metadata{SyncedAt: time.Now().UTC(), SourceURL: apiURL}
+	m := Metadata{SyncedAt: time.Now().UTC(), SourceURL: apiURL, SourceRef: UpstreamRef}
 	for _, it := range items {
 		if !(strings.HasSuffix(it.Name, ".yml") || strings.HasSuffix(it.Name, ".yaml")) {
 			continue

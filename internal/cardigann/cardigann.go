@@ -114,7 +114,7 @@ func SearchRequestWithOptions(d *Definition, opt SearchOptions) RequestSpec {
 	if path == "" {
 		path = "/"
 	}
-	method := strings.ToLower(first(str(pathMap["method"]), str(search["method"]), "get"))
+	method := renderedMethod(first(anyString(pathMap["method"]), anyString(search["method"]), "get"), d.Config, q, nil)
 	inputs := map[string]string{}
 	if inherit, ok := pathMap["inheritinputs"]; !ok || fmt.Sprint(inherit) != "false" {
 		mergeRendered(inputs, mapAny(search["inputs"]), d.Config, q, nil)
@@ -191,7 +191,7 @@ func LoginRequest(d *Definition) RequestSpec {
 	if cookies := renderedCookies(mapAny(login["cookies"]), d.Config, q); cookies != "" {
 		headers["Cookie"] = cookies
 	}
-	return RequestSpec{Method: strings.ToLower(first(str(login["method"]), "get")), Path: Render(anyString(login["path"]), d.Config, q, nil), Inputs: inputs, Headers: headers, FollowRedirect: FollowRedirect(d)}
+	return RequestSpec{Method: renderedMethod(first(anyString(login["method"]), "get"), d.Config, q, nil), Path: Render(anyString(login["path"]), d.Config, q, nil), Inputs: inputs, Headers: headers, FollowRedirect: FollowRedirect(d)}
 }
 
 func DownloadBeforeRequest(d *Definition, rawURL string) RequestSpec {
@@ -209,7 +209,7 @@ func DownloadBeforeRequest(d *Definition, rawURL string) RequestSpec {
 		headers[k] = Render(anyString(v), d.Config, q, nil)
 	}
 	return RequestSpec{
-		Method:         strings.ToLower(first(str(before["method"]), "get")),
+		Method:         renderedMethod(first(anyString(before["method"]), "get"), d.Config, q, nil),
 		Path:           Render(anyString(before["path"]), d.Config, q, nil),
 		Inputs:         inputs,
 		Headers:        headers,
@@ -911,6 +911,10 @@ func validFilename(s string) string {
 		s = strings.ReplaceAll(s, "__", "_")
 	}
 	return s
+}
+
+func renderedMethod(t string, cfg, query, result map[string]string) string {
+	return strings.ToLower(strings.TrimSpace(Render(t, cfg, query, result)))
 }
 
 func Render(t string, cfg, query, result map[string]string) string {

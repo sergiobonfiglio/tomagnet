@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -134,7 +135,7 @@ func (s *Session) Do(ctx context.Context, spec Request) (Response, error) {
 	}
 	if r.StatusCode < 200 || r.StatusCode >= 300 {
 		if !(spec.FollowRedirect != nil && !*spec.FollowRedirect && r.StatusCode >= 300 && r.StatusCode < 400) {
-			return Response{}, &url.Error{Op: method, URL: u.String(), Err: http.ErrAbortHandler}
+			return Response{}, &url.Error{Op: method, URL: u.String(), Err: fmt.Errorf("unexpected HTTP status %s", r.Status)}
 		}
 	}
 	cookies := map[string]string{}

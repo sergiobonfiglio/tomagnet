@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -22,6 +23,21 @@ func TestDoReturnsSetCookies(t *testing.T) {
 	}
 	if r.Cookies["sid"] != "1" {
 		t.Fatalf("cookies = %#v", r.Cookies)
+	}
+}
+
+func TestDoReturnsHTTPStatusError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "blocked", http.StatusForbidden)
+	}))
+	defer ts.Close()
+
+	_, err := Do(context.Background(), Request{Base: ts.URL, Path: "/"}, time.Second, nil)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if got := err.Error(); !strings.Contains(got, "unexpected HTTP status 403 Forbidden") {
+		t.Fatalf("error = %q", got)
 	}
 }
 

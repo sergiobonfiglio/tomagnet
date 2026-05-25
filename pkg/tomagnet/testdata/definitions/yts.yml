@@ -1,0 +1,24 @@
+id: yts
+name: YTS
+links:
+  - https://yts.bz/
+caps:
+  modes:
+    search: [q]
+    movie-search: [q, imdbid]
+search:
+  paths:
+    - path: https://movies-api.accel.li/api/v2/list_movies.json
+      response:
+        type: json
+  keywordsfilters:
+    - name: re_replace
+      args: ["[^\\w]+", " "]
+  rows:
+    selector: data.movies
+  fields:
+    title:
+      selector: ..title_long
+      filters:
+        - name: append
+          args: " -YTS"

@@ -1,0 +1,17 @@
+id: thepiratebay
+name: The Pirate Bay
+links:
+  - https://thepiratebay.org/
+caps:
+  modes:
+    search: [q]
+search:
+  path: /search/{{ .Keywords }}/1/99/0
+  rows:
+    selector: '#searchResult tr:has(a.detLink)'
+  fields:
+    title:
+      selector: a.detLink
+      filters:
+        - name: replace
+          args: [":", ""]

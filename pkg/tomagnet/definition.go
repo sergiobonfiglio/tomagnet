@@ -1,8 +1,11 @@
 package tomagnet
 
 import (
+	"bytes"
+	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/sergiobonfiglio/tomagnet/internal/cardigann"
 	"gopkg.in/yaml.v3"
@@ -48,17 +51,102 @@ type SearchMode struct {
 	Params []SearchParam `yaml:"params"`
 }
 
+// UnmarshalYAML accepts both the typed shape tomagnet exposes publicly
+// (`params: [{name: ...}]`) and the shorthand array form used by many Jackett
+// definitions (`search: [q, imdbid]`). This keeps Jackett compatibility inside
+// tomagnet instead of requiring callers to normalize YAML before decoding.
+func (s *SearchMode) UnmarshalYAML(value *yaml.Node) error {
+	type rawSearchMode SearchMode
+	if value.Kind == yaml.SequenceNode {
+		var params []string
+		if err := value.Decode(&params); err != nil {
+			return err
+		}
+		s.Params = make([]SearchParam, 0, len(params))
+		for _, param := range params {
+			s.Params = append(s.Params, SearchParam{Name: param})
+		}
+		return nil
+	}
+	var aux rawSearchMode
+	if err := value.Decode(&aux); err != nil {
+		return err
+	}
+	*s = SearchMode(aux)
+	return nil
+}
+
 type SearchParam struct {
 	Name string `yaml:"name"`
+}
+
+type StringMap map[string]string
+
+// UnmarshalYAML accepts either scalar values or single-/multi-value YAML lists
+// for map entries. Jackett commonly encodes headers as `Header: ["value"]`.
+// Tomagnet keeps a string-valued public API and uses the first list element.
+func (m *StringMap) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind != yaml.MappingNode {
+		return fmt.Errorf("expected mapping, got %v", value.Kind)
+	}
+	out := make(StringMap, len(value.Content)/2)
+	for i := 0; i < len(value.Content); i += 2 {
+		key := value.Content[i].Value
+		val := value.Content[i+1]
+		switch val.Kind {
+		case yaml.SequenceNode:
+			if len(val.Content) == 0 {
+				out[key] = ""
+				continue
+			}
+			out[key] = val.Content[0].Value
+		default:
+			out[key] = val.Value
+		}
+	}
+	*m = out
+	return nil
+}
+
+type CookieMap map[string]string
+
+// UnmarshalYAML accepts both mapping cookies (`uid: ...`) and the Jackett
+// shorthand sequence form (`cookies: ["JAVA=OK"]`). Sequence items are parsed
+// as `name=value` cookie pairs.
+func (m *CookieMap) UnmarshalYAML(value *yaml.Node) error {
+	switch value.Kind {
+	case yaml.MappingNode:
+		var out StringMap
+		if err := value.Decode(&out); err != nil {
+			return err
+		}
+		*m = CookieMap(out)
+		return nil
+	case yaml.SequenceNode:
+		out := make(CookieMap, len(value.Content))
+		for _, item := range value.Content {
+			cookie := item.Value
+			name, val, ok := strings.Cut(cookie, "=")
+			if !ok {
+				out[cookie] = ""
+				continue
+			}
+			out[name] = val
+		}
+		*m = out
+		return nil
+	default:
+		return fmt.Errorf("expected mapping or sequence, got %v", value.Kind)
+	}
 }
 
 type SearchDefinition struct {
 	Path                 string                     `yaml:"path"`
 	Paths                []SearchPath               `yaml:"paths"`
 	Method               string                     `yaml:"method"`
-	Inputs               map[string]string          `yaml:"inputs"`
-	Headers              map[string]string          `yaml:"headers"`
-	Cookies              map[string]string          `yaml:"cookies"`
+	Inputs               StringMap                  `yaml:"inputs"`
+	Headers              StringMap                  `yaml:"headers"`
+	Cookies              CookieMap                  `yaml:"cookies"`
 	Rows                 RowsDefinition             `yaml:"rows"`
 	Fields               map[string]FieldDefinition `yaml:"fields"`
 	Error                []ErrorSelector            `yaml:"error"`
@@ -68,13 +156,13 @@ type SearchDefinition struct {
 }
 
 type SearchPath struct {
-	Path           string            `yaml:"path"`
-	Method         string            `yaml:"method"`
-	Inputs         map[string]string `yaml:"inputs"`
-	Categories     []string          `yaml:"categories"`
-	Response       ResponseSpec      `yaml:"response"`
-	FollowRedirect bool              `yaml:"followredirect"`
-	InheritInputs  *bool             `yaml:"inheritinputs"`
+	Path           string       `yaml:"path"`
+	Method         string       `yaml:"method"`
+	Inputs         StringMap    `yaml:"inputs"`
+	Categories     []string     `yaml:"categories"`
+	Response       ResponseSpec `yaml:"response"`
+	FollowRedirect bool         `yaml:"followredirect"`
+	InheritInputs  *bool        `yaml:"inheritinputs"`
 }
 
 type ResponseSpec struct {
@@ -109,9 +197,9 @@ type LoginDefinition struct {
 	Form           string                   `yaml:"form"`
 	SubmitPath     string                   `yaml:"submitpath"`
 	Selectors      bool                     `yaml:"selectors"`
-	Inputs         map[string]string        `yaml:"inputs"`
-	Headers        map[string]string        `yaml:"headers"`
-	Cookies        map[string]string        `yaml:"cookies"`
+	Inputs         StringMap                `yaml:"inputs"`
+	Headers        StringMap                `yaml:"headers"`
+	Cookies        CookieMap                `yaml:"cookies"`
 	Test           LoginTest                `yaml:"test"`
 	Captcha        LoginCaptcha             `yaml:"captcha"`
 	SelectorInputs map[string]SelectorInput `yaml:"selectorinputs"`
@@ -144,11 +232,11 @@ type DownloadInfoHash struct {
 }
 
 type DownloadBeforeRequest struct {
-	PathSelector SelectorSpec      `yaml:"pathselector"`
-	Method       string            `yaml:"method"`
-	Path         string            `yaml:"path"`
-	Inputs       map[string]string `yaml:"inputs"`
-	Headers      map[string]string `yaml:"headers"`
+	PathSelector SelectorSpec `yaml:"pathselector"`
+	Method       string       `yaml:"method"`
+	Path         string       `yaml:"path"`
+	Inputs       StringMap    `yaml:"inputs"`
+	Headers      StringMap    `yaml:"headers"`
 }
 
 type DetailsDefinition struct {
@@ -185,21 +273,59 @@ type Filter struct {
 	Args []string `yaml:"args"`
 }
 
-func DecodeDefinition(r io.Reader) (*Definition, error) {
-	var d Definition
-	if err := yaml.NewDecoder(r).Decode(&d); err != nil {
-		return nil, err
+// UnmarshalYAML accepts both the typed args form (`args: [":", ""]`) and
+// the scalar shorthand used by some Jackett definitions (`args: " suffix"`).
+// Scalar args are normalized to a single-element slice so the rest of tomagnet
+// can keep using a stable typed API.
+func (f *Filter) UnmarshalYAML(value *yaml.Node) error {
+	var aux struct {
+		Name string `yaml:"name"`
+		Args any    `yaml:"args"`
 	}
-	return &d, nil
+	if err := value.Decode(&aux); err != nil {
+		return err
+	}
+	f.Name = aux.Name
+	switch args := aux.Args.(type) {
+	case nil:
+		f.Args = nil
+	case []any:
+		f.Args = make([]string, 0, len(args))
+		for _, arg := range args {
+			f.Args = append(f.Args, fmt.Sprint(arg))
+		}
+	default:
+		f.Args = []string{fmt.Sprint(args)}
+	}
+	return nil
 }
 
-func LoadDefinition(path string) (*Definition, error) {
-	f, err := os.Open(path)
+func DecodeDefinition(r io.Reader) (*Definition, error) {
+	b, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
-	return DecodeDefinition(f)
+	return decodeDefinitionBytes(b)
+}
+
+func LoadDefinition(path string) (*Definition, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return decodeDefinitionBytes(b)
+}
+
+func decodeDefinitionBytes(b []byte) (*Definition, error) {
+	var d Definition
+	if err := yaml.NewDecoder(bytes.NewReader(b)).Decode(&d); err == nil {
+		return &d, nil
+	}
+	fixed := []byte(strings.ReplaceAll(string(b), `\/`, `/`))
+	if err := yaml.NewDecoder(bytes.NewReader(fixed)).Decode(&d); err != nil {
+		return nil, err
+	}
+	return &d, nil
 }
 
 func (d Definition) cardigann() *cardigann.Definition {
@@ -488,12 +614,23 @@ func putFilters(m map[string]any, k string, filters []Filter) {
 	}
 	m[k] = out
 }
-func putMap(m map[string]any, k string, v map[string]string) {
-	if len(v) == 0 {
+func putMap(m map[string]any, k string, v any) {
+	var src map[string]string
+	switch x := v.(type) {
+	case map[string]string:
+		src = x
+	case StringMap:
+		src = map[string]string(x)
+	case CookieMap:
+		src = map[string]string(x)
+	default:
+		return
+	}
+	if len(src) == 0 {
 		return
 	}
 	out := map[string]any{}
-	for kk, vv := range v {
+	for kk, vv := range src {
 		out[kk] = vv
 	}
 	m[k] = out
