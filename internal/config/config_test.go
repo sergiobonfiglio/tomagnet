@@ -25,7 +25,7 @@ func TestLoadMissingDefaultConfigUsesTopPublicIndexers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"yts", "1337x", "thepiratebay"}
+	want := []string{"yts", "limetorrents", "thepiratebay"}
 	if len(idx) != len(want) {
 		t.Fatalf("got %d indexers want %d", len(idx), len(want))
 	}

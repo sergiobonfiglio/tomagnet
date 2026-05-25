@@ -10,7 +10,7 @@ import (
 
 const Path = "tomagnet.yaml"
 
-var DefaultIndexers = []string{"yts", "1337x", "thepiratebay"}
+var DefaultIndexers = []string{"yts", "limetorrents", "thepiratebay"}
 
 type Config struct {
 	DefaultTimeoutSeconds int       `yaml:"default_timeout_seconds"`

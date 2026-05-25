@@ -3,6 +3,7 @@ package search
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -23,6 +24,8 @@ import (
 	"golang.org/x/net/html"
 	"golang.org/x/text/encoding/htmlindex"
 )
+
+var errBrowserChallenge = errors.New("indexer returned a browser challenge")
 
 type Options struct {
 	Query              string
@@ -340,12 +343,19 @@ func tryBases[T any](bases []string, fn func(string) (T, error)) (T, error) {
 		return zero, fmt.Errorf("no base urls")
 	}
 	var last error
+	var preferred error
 	for _, base := range bases {
 		v, err := fn(base)
 		if err == nil {
 			return v, nil
 		}
 		last = err
+		if preferred == nil && errors.Is(err, errBrowserChallenge) {
+			preferred = err
+		}
+	}
+	if preferred != nil {
+		return zero, fmt.Errorf("all base urls failed: %w", preferred)
 	}
 	if last == nil {
 		last = fmt.Errorf("all base urls failed")
@@ -452,6 +462,9 @@ func checkErrorSelectors(d *cardigann.Definition, s string) error {
 	if gjson.Valid(s) {
 		return nil
 	}
+	if challengeRequested(d, s) {
+		return fmt.Errorf("%w: this is not a no-results response", errBrowserChallenge)
+	}
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(s))
 	if err != nil {
 		return nil
@@ -471,6 +484,42 @@ func checkErrorSelectors(d *cardigann.Definition, s string) error {
 		return fmt.Errorf("indexer error: %s", strings.TrimSpace(msg))
 	}
 	return nil
+}
+
+func challengeRequested(d *cardigann.Definition, s string) bool {
+	if hasFlareSolverrHint(d) {
+		return true
+	}
+	markers := []string{
+		"FingerprintJS.load(",
+		"/js/fingerprint/",
+		"cf-browser-verification",
+		"cf-turnstile",
+		"challenge-platform",
+		"window.location.replace('",
+		"?ch=1&js=",
+		"Click here to enter",
+	}
+	for _, marker := range markers {
+		if strings.Contains(s, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasFlareSolverrHint(d *cardigann.Definition) bool {
+	if d == nil || d.Raw == nil {
+		return false
+	}
+	settings, _ := d.Raw["settings"].([]any)
+	for _, v := range settings {
+		m, _ := v.(map[string]any)
+		if strings.EqualFold(fmt.Sprint(m["type"]), "info_flaresolverr") {
+			return true
+		}
+	}
+	return false
 }
 
 func parseJSON(indexer string, d *cardigann.Definition, s string, limit int) []Result {

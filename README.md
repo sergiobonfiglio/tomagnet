@@ -6,7 +6,7 @@ It can fetch Cardigann/Jackett-style indexer definitions on demand, keep them in
 
 ## Version
 
-Current version: **0.3.1**
+Current version: **0.3.2**
 
 ```bash
 tomagnet --version
@@ -15,7 +15,7 @@ tomagnet --version
 ## Install
 
 ```bash
-go install github.com/sergiobonfiglio/tomagnet/cmd/tomagnet@v0.3.1
+go install github.com/sergiobonfiglio/tomagnet/cmd/tomagnet@v0.3.2
 ```
 
 Or build from a checkout:
@@ -43,7 +43,7 @@ tomagnet test nyaasi
 
 ## Configuration
 
-`tomagnet.yaml` is optional. Without it, searches use the default public indexers: `yts`, `1337x`, and `thepiratebay`.
+`tomagnet.yaml` is optional. Without it, searches use the default public indexers: `yts`, `limetorrents`, and `thepiratebay`.
 
 Create a local config from the example if you need custom settings:
 
@@ -69,6 +69,8 @@ indexers:
 ```
 
 Definitions resolve from `./definitions/<id>.yml|yaml`, then `./.tomagnet/definitions/<id>.yml|yaml`.
+
+Indexers protected by browser challenges are not supported at the moment. `tomagnet` currently treats these as unsupported and tries to detect them using the Cardigann `info_flaresolverr` hint plus a small set of response-body heuristics. This is best-effort detection, not full browser challenge support.
 
 ## Library usage
 

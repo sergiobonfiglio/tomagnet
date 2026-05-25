@@ -32,3 +32,20 @@ func TestParseReturnsCardigannErrorSelector(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestParseReturnsChallengeErrorInsteadOfEmptyResults(t *testing.T) {
+	d := &cardigann.Definition{Config: map[string]string{}, Raw: map[string]any{
+		"settings": []any{map[string]any{"type": "info_flaresolverr"}},
+		"search":   map[string]any{"rows": map[string]any{"selector": ".item"}},
+	}}
+	cases := []string{
+		`<html><script src="/js/fingerprint/iife.min.js"></script><script>FingerprintJS.load({monitoring:false})</script></html>`,
+		`<html><head><title>Loading...</title></head><body><script type='text/javascript'>window.location.replace('https://idx.test/search?ch=1&js=token&sid=abc');</script></body></html>`,
+	}
+	for _, body := range cases {
+		_, err := Parse("idx", d, []byte(body), "text/html", 10)
+		if err == nil || !strings.Contains(err.Error(), "browser challenge") {
+			t.Fatalf("err = %v", err)
+		}
+	}
+}
