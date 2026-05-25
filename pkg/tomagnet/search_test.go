@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 )
 
@@ -28,6 +29,23 @@ func TestSearchOptionsExposeModeAwareFields(t *testing.T) {
 
 	if opt.Mode != "movie-search" || opt.Season != "1" || opt.Episode != "2" || opt.IMDBID != "tt1" || opt.TMDBID != "tm1" || opt.TVDBID != "tv1" || opt.DoubanID != "db1" || opt.TVMazeID != "mz1" || opt.Artist != "art" || opt.Album != "alb" || opt.Author != "auth" || opt.Title != "ttl" || opt.Genre != "gen" || opt.Year != "2024" || len(opt.Categories) != 1 {
 		t.Fatalf("opt=%#v", opt)
+	}
+}
+
+func TestDefaultIndexersExposeCurrentDefaults(t *testing.T) {
+	indexers := DefaultIndexers()
+	ids := make([]string, 0, len(indexers))
+	for _, idx := range indexers {
+		ids = append(ids, idx.ID)
+		if idx.BaseURL == "" {
+			t.Fatalf("default indexer %q missing base url", idx.ID)
+		}
+		if idx.TimeoutSeconds <= 0 {
+			t.Fatalf("default indexer %q missing timeout", idx.ID)
+		}
+	}
+	if !slices.Equal(ids, []string{"yts", "limetorrents", "thepiratebay"}) {
+		t.Fatalf("ids=%v", ids)
 	}
 }
 
