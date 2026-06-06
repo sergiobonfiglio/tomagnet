@@ -3,16 +3,19 @@ package fetch
 import (
 	"context"
 	"crypto/sha1"
-	"crypto/tls"
+	stdtls "crypto/tls"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
 	"strings"
 	"time"
+
+	tls "github.com/refraction-networking/utls"
 )
 
 type Response struct {
@@ -98,18 +101,7 @@ func (s *Session) Do(ctx context.Context, spec Request) (Response, error) {
 	if s != nil && s.jar != nil {
 		c.Jar = s.jar
 	}
-	if s != nil && len(s.certificates) > 0 {
-		c.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true, VerifyConnection: func(cs tls.ConnectionState) error {
-			if len(cs.PeerCertificates) == 0 {
-				return nil
-			}
-			sum := sha1.Sum(cs.PeerCertificates[0].Raw)
-			if s.certificates[hex.EncodeToString(sum[:])] {
-				return nil
-			}
-			return errors.New("untrusted server certificate")
-		}}}
-	}
+	c.Transport = newTransport(s)
 	if spec.FollowRedirect != nil && !*spec.FollowRedirect {
 		c.CheckRedirect = func(req *http.Request, via []*http.Request) error { return http.ErrUseLastResponse }
 	}
@@ -155,4 +147,57 @@ func buildURL(base, path string) (*url.URL, error) {
 		return nil, err
 	}
 	return u.ResolveReference(p), nil
+}
+
+func newTransport(s *Session) *http.Transport {
+	tr := &http.Transport{
+		Proxy:             http.ProxyFromEnvironment,
+		ForceAttemptHTTP2: false,
+		TLSNextProto:      map[string]func(string, *stdtls.Conn) http.RoundTripper{},
+	}
+	tr.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		host := addr
+		if h, _, err := net.SplitHostPort(addr); err == nil {
+			host = h
+		}
+		cfg := &tls.Config{ServerName: host}
+		if s != nil && len(s.certificates) > 0 {
+			cfg.InsecureSkipVerify = true
+			cfg.VerifyConnection = func(cs tls.ConnectionState) error {
+				if len(cs.PeerCertificates) == 0 {
+					return nil
+				}
+				sum := sha1.Sum(cs.PeerCertificates[0].Raw)
+				if s.certificates[hex.EncodeToString(sum[:])] {
+					return nil
+				}
+				return errors.New("untrusted server certificate")
+			}
+		}
+		conn, err := (&net.Dialer{}).DialContext(ctx, network, addr)
+		if err != nil {
+			return nil, err
+		}
+		spec, err := tls.UTLSIdToSpec(tls.HelloChrome_Auto)
+		if err != nil {
+			_ = conn.Close()
+			return nil, err
+		}
+		for _, ext := range spec.Extensions {
+			if alpn, ok := ext.(*tls.ALPNExtension); ok {
+				alpn.AlpnProtocols = []string{"http/1.1"}
+			}
+		}
+		uconn := tls.UClient(conn, cfg, tls.HelloCustom)
+		if err := uconn.ApplyPreset(&spec); err != nil {
+			_ = conn.Close()
+			return nil, err
+		}
+		if err := uconn.HandshakeContext(ctx); err != nil {
+			_ = conn.Close()
+			return nil, err
+		}
+		return uconn, nil
+	}
+	return tr
 }
