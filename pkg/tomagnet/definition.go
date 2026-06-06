@@ -11,43 +11,77 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Definition is a public Cardigann- or Jackett-style indexer definition.
+//
+// Most callers load a Definition with LoadDefinition or LoadDefinitionByID and
+// pass it to Search through Indexer.Definition. The nested exported structs let
+// callers inspect or build definitions programmatically.
 type Definition struct {
-	ID             string             `yaml:"id"`
-	Name           string             `yaml:"name"`
-	BaseURL        string             `yaml:"base_url"`
-	Site           string             `yaml:"site"`
-	URL            string             `yaml:"url"`
-	Links          []string           `yaml:"links"`
-	LegacyLinks    []string           `yaml:"legacylinks"`
-	FollowRedirect bool               `yaml:"followredirect"`
-	Certificates   []string           `yaml:"certificates"`
-	RequestDelay   string             `yaml:"requestDelay"`
-	Encoding       string             `yaml:"encoding"`
-	Settings       []Setting          `yaml:"settings"`
-	Caps           Caps               `yaml:"caps"`
-	Search         SearchDefinition   `yaml:"search"`
-	Login          LoginDefinition    `yaml:"login"`
-	Download       DownloadDefinition `yaml:"download"`
-	Details        DetailsDefinition  `yaml:"details"`
+	// ID is the stable identifier for the definition.
+	ID string `yaml:"id"`
+	// Name is the human-readable indexer name.
+	Name string `yaml:"name"`
+	// BaseURL is the preferred base URL override for the indexer.
+	BaseURL string `yaml:"base_url"`
+	// Site is a legacy base URL field used by some definitions.
+	Site string `yaml:"site"`
+	// URL is a legacy base URL field used by some definitions.
+	URL string `yaml:"url"`
+	// Links lists known working base URLs and mirrors.
+	Links []string `yaml:"links"`
+	// LegacyLinks lists additional fallback URLs and mirrors.
+	LegacyLinks []string `yaml:"legacylinks"`
+	// FollowRedirect controls whether requests follow HTTP redirects by default.
+	FollowRedirect bool `yaml:"followredirect"`
+	// Certificates lists pinned certificate fingerprints for self-signed sites.
+	Certificates []string `yaml:"certificates"`
+	// RequestDelay is the minimum delay between requests to the indexer.
+	RequestDelay string `yaml:"requestDelay"`
+	// Encoding overrides the response body encoding when it is not UTF-8.
+	Encoding string `yaml:"encoding"`
+	// Settings declares user-configurable definition settings.
+	Settings []Setting `yaml:"settings"`
+	// Caps describes supported categories and search modes.
+	Caps Caps `yaml:"caps"`
+	// Search describes how to build and parse search requests.
+	Search SearchDefinition `yaml:"search"`
+	// Login describes an optional authenticated login flow.
+	Login LoginDefinition `yaml:"login"`
+	// Download describes how to resolve download or magnet URLs.
+	Download DownloadDefinition `yaml:"download"`
+	// Details describes how to enrich results from a details page.
+	Details DetailsDefinition `yaml:"details"`
 }
 
+// Setting describes a configurable definition setting and its default value.
 type Setting struct {
-	Name    string `yaml:"name"`
+	// Name is the setting key referenced by templates.
+	Name string `yaml:"name"`
+	// Default is the default value for the setting.
 	Default string `yaml:"default"`
 }
 
+// Caps describes the categories and search modes supported by a definition.
 type Caps struct {
-	CategoryMappings []CategoryMapping     `yaml:"categorymappings"`
-	Modes            map[string]SearchMode `yaml:"modes"`
+	// CategoryMappings maps indexer-specific categories to normalized ones.
+	CategoryMappings []CategoryMapping `yaml:"categorymappings"`
+	// Modes lists supported search modes keyed by mode name.
+	Modes map[string]SearchMode `yaml:"modes"`
 }
 
+// CategoryMapping maps an indexer-specific category ID to a normalized category.
 type CategoryMapping struct {
-	ID      string `yaml:"id"`
-	Cat     string `yaml:"cat"`
-	Default bool   `yaml:"default"`
+	// ID is the source category identifier.
+	ID string `yaml:"id"`
+	// Cat is the normalized category name or id.
+	Cat string `yaml:"cat"`
+	// Default reports whether the category should be used by default.
+	Default bool `yaml:"default"`
 }
 
+// SearchMode describes the parameters supported by a search mode.
 type SearchMode struct {
+	// Params lists supported parameter names for the mode.
 	Params []SearchParam `yaml:"params"`
 }
 
@@ -76,10 +110,13 @@ func (s *SearchMode) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+// SearchParam names one supported parameter in a search mode.
 type SearchParam struct {
+	// Name is the parameter name, such as q, imdbid, or season.
 	Name string `yaml:"name"`
 }
 
+// StringMap is a string-to-string mapping used by definition sections.
 type StringMap map[string]string
 
 // UnmarshalYAML accepts either scalar values or single-/multi-value YAML lists
@@ -108,6 +145,7 @@ func (m *StringMap) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+// CookieMap is a cookie-name to cookie-value mapping used by definitions.
 type CookieMap map[string]string
 
 // UnmarshalYAML accepts both mapping cookies (`uid: ...`) and the Jackett
@@ -140,46 +178,79 @@ func (m *CookieMap) UnmarshalYAML(value *yaml.Node) error {
 	}
 }
 
+// SearchDefinition describes how to build and parse a search request.
 type SearchDefinition struct {
-	Path                 string                     `yaml:"path"`
-	Paths                []SearchPath               `yaml:"paths"`
-	Method               string                     `yaml:"method"`
-	Inputs               StringMap                  `yaml:"inputs"`
-	Headers              StringMap                  `yaml:"headers"`
-	Cookies              CookieMap                  `yaml:"cookies"`
-	Rows                 RowsDefinition             `yaml:"rows"`
-	Fields               map[string]FieldDefinition `yaml:"fields"`
-	Error                []ErrorSelector            `yaml:"error"`
-	PreprocessingFilters []Filter                   `yaml:"preprocessingfilters"`
-	KeywordsFilters      []Filter                   `yaml:"keywordsfilters"`
-	AllowEmptyInputs     bool                       `yaml:"allowEmptyInputs"`
+	// Path is the default request path template.
+	Path string `yaml:"path"`
+	// Paths contains path-specific overrides, often selected by category.
+	Paths []SearchPath `yaml:"paths"`
+	// Method is the HTTP method to use.
+	Method string `yaml:"method"`
+	// Inputs are form or query inputs rendered from templates.
+	Inputs StringMap `yaml:"inputs"`
+	// Headers are additional HTTP headers.
+	Headers StringMap `yaml:"headers"`
+	// Cookies are additional cookies sent with the request.
+	Cookies CookieMap `yaml:"cookies"`
+	// Rows selects the result collection in the response body.
+	Rows RowsDefinition `yaml:"rows"`
+	// Fields maps normalized result field names to extraction rules.
+	Fields map[string]FieldDefinition `yaml:"fields"`
+	// Error describes response conditions that should be treated as failures.
+	Error []ErrorSelector `yaml:"error"`
+	// PreprocessingFilters transform the raw response before parsing.
+	PreprocessingFilters []Filter `yaml:"preprocessingfilters"`
+	// KeywordsFilters transform the input keywords before request rendering.
+	KeywordsFilters []Filter `yaml:"keywordsfilters"`
+	// AllowEmptyInputs keeps empty rendered inputs instead of dropping them.
+	AllowEmptyInputs bool `yaml:"allowEmptyInputs"`
 }
 
+// SearchPath describes a path-specific override in SearchDefinition.Paths.
 type SearchPath struct {
-	Path           string       `yaml:"path"`
-	Method         string       `yaml:"method"`
-	Inputs         StringMap    `yaml:"inputs"`
-	Categories     []string     `yaml:"categories"`
-	Response       ResponseSpec `yaml:"response"`
-	FollowRedirect bool         `yaml:"followredirect"`
-	InheritInputs  *bool        `yaml:"inheritinputs"`
+	// Path is the request path template.
+	Path string `yaml:"path"`
+	// Method overrides the HTTP method for this path.
+	Method string `yaml:"method"`
+	// Inputs overrides or extends the default inputs for this path.
+	Inputs StringMap `yaml:"inputs"`
+	// Categories selects this path when one of these categories is requested.
+	Categories []string `yaml:"categories"`
+	// Response describes the expected response type for this path.
+	Response ResponseSpec `yaml:"response"`
+	// FollowRedirect overrides redirect behavior for this path.
+	FollowRedirect bool `yaml:"followredirect"`
+	// InheritInputs controls whether base search inputs are inherited.
+	InheritInputs *bool `yaml:"inheritinputs"`
 }
 
+// ResponseSpec describes the expected response type for a request.
 type ResponseSpec struct {
+	// Type is the response format, such as "json".
 	Type string `yaml:"type"`
 }
 
+// RowsDefinition describes how to select result rows from a response.
 type RowsDefinition struct {
-	Selector                        string   `yaml:"selector"`
-	Attribute                       string   `yaml:"attribute"`
-	Remove                          string   `yaml:"remove"`
-	MissingAttributeEqualsNoResults bool     `yaml:"missingAttributeEqualsNoResults"`
-	Filters                         []Filter `yaml:"filters"`
-	DateHeaders                     Selector `yaml:"dateheaders"`
-	Count                           Selector `yaml:"count"`
-	After                           int      `yaml:"after"`
+	// Selector identifies the row collection in the response.
+	Selector string `yaml:"selector"`
+	// Attribute extracts row content from an attribute instead of node text.
+	Attribute string `yaml:"attribute"`
+	// Remove strips matching content before row parsing.
+	Remove string `yaml:"remove"`
+	// MissingAttributeEqualsNoResults treats a missing attribute as an empty result set.
+	MissingAttributeEqualsNoResults bool `yaml:"missingAttributeEqualsNoResults"`
+	// Filters transform the selected rows before field extraction.
+	Filters []Filter `yaml:"filters"`
+	// DateHeaders describes how to parse grouped date headers.
+	DateHeaders Selector `yaml:"dateheaders"`
+	// Count extracts an explicit total-count value when present.
+	Count Selector `yaml:"count"`
+	// After skips the first N matched rows.
+	After int `yaml:"after"`
 }
 
+// FieldDefinition describes how to extract one normalized result field.
 type FieldDefinition struct {
 	Selector  string            `yaml:"selector"`
 	Attribute string            `yaml:"attribute"`
@@ -191,6 +262,7 @@ type FieldDefinition struct {
 	Filters   []Filter          `yaml:"filters"`
 }
 
+// LoginDefinition describes an optional login flow for a definition.
 type LoginDefinition struct {
 	Method         string                   `yaml:"method"`
 	Path           string                   `yaml:"path"`
@@ -205,32 +277,38 @@ type LoginDefinition struct {
 	SelectorInputs map[string]SelectorInput `yaml:"selectorinputs"`
 }
 
+// LoginTest describes how to verify a logged-in session.
 type LoginTest struct {
 	Path     string `yaml:"path"`
 	Selector string `yaml:"selector"`
 }
 
+// LoginCaptcha describes the captcha type required by a login flow.
 type LoginCaptcha struct {
 	Type string `yaml:"type"`
 }
 
+// SelectorInput describes how to extract a value for a login input.
 type SelectorInput struct {
 	Selector  string   `yaml:"selector"`
 	Attribute string   `yaml:"attribute"`
 	Filters   []Filter `yaml:"filters"`
 }
 
+// DownloadDefinition describes how to resolve a download or magnet URL.
 type DownloadDefinition struct {
 	Selectors []SelectorSpec        `yaml:"selectors"`
 	InfoHash  DownloadInfoHash      `yaml:"infohash"`
 	Before    DownloadBeforeRequest `yaml:"before"`
 }
 
+// DownloadInfoHash describes how to extract an info hash.
 type DownloadInfoHash struct {
 	Hash              SelectorSpec `yaml:"hash"`
 	UseBeforeResponse bool         `yaml:"usebeforeresponse"`
 }
 
+// DownloadBeforeRequest describes a request that must run before download.
 type DownloadBeforeRequest struct {
 	PathSelector SelectorSpec `yaml:"pathselector"`
 	Method       string       `yaml:"method"`
@@ -239,19 +317,23 @@ type DownloadBeforeRequest struct {
 	Headers      StringMap    `yaml:"headers"`
 }
 
+// DetailsDefinition describes how to enrich a result using a details page.
 type DetailsDefinition struct {
 	Fields map[string]DetailField `yaml:"fields"`
 }
 
+// DetailField extracts one field from a details page.
 type DetailField struct {
 	Selector  string `yaml:"selector"`
 	Attribute string `yaml:"attribute"`
 }
 
+// Selector is a minimal selector wrapper used in several definition sections.
 type Selector struct {
 	Selector string `yaml:"selector"`
 }
 
+// SelectorSpec selects a value and optionally transforms it with filters.
 type SelectorSpec struct {
 	Selector          string   `yaml:"selector"`
 	Attribute         string   `yaml:"attribute"`
@@ -259,15 +341,18 @@ type SelectorSpec struct {
 	UseBeforeResponse bool     `yaml:"usebeforeresponse"`
 }
 
+// ErrorSelector describes an error condition that should abort parsing.
 type ErrorSelector struct {
 	Selector string       `yaml:"selector"`
 	Message  ErrorMessage `yaml:"message"`
 }
 
+// ErrorMessage extracts the human-readable message for an ErrorSelector.
 type ErrorMessage struct {
 	Selector string `yaml:"selector"`
 }
 
+// Filter describes one Cardigann/Jackett filter invocation.
 type Filter struct {
 	Name string   `yaml:"name"`
 	Args []string `yaml:"args"`
@@ -300,6 +385,7 @@ func (f *Filter) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+// DecodeDefinition decodes one definition from YAML.
 func DecodeDefinition(r io.Reader) (*Definition, error) {
 	b, err := io.ReadAll(r)
 	if err != nil {
@@ -308,6 +394,7 @@ func DecodeDefinition(r io.Reader) (*Definition, error) {
 	return decodeDefinitionBytes(b)
 }
 
+// LoadDefinition reads and decodes one definition file from disk.
 func LoadDefinition(path string) (*Definition, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {

@@ -408,7 +408,7 @@ func runOneBase(ctx context.Context, d *cardigann.Definition, idx config.Indexer
 		}
 	}
 	param := cardigann.QueryParamForMode(d, firstNonEmpty(opt.Mode, "search"))
-	if strings.Contains(spec.Path, "?") || len(spec.Inputs) > 0 {
+	if spec.QueryInTemplate || strings.Contains(spec.Path, "?") || len(spec.Inputs) > 0 {
 		param = ""
 	}
 	fr, err := rq.Do(ctx, fetch.Request{Method: spec.Method, Base: d.BaseURL, Path: spec.Path, Param: param, Query: queryValue(d, opt), Inputs: spec.Inputs, Headers: spec.Headers, FollowRedirect: &spec.FollowRedirect})

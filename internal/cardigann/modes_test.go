@@ -28,18 +28,21 @@ func TestSearchRequestWithOptionsRendersStructuredQueryFields(t *testing.T) {
 	d := &Definition{Config: map[string]string{}, Raw: map[string]any{
 		"search": map[string]any{
 			"inputs": map[string]any{
-				"search":       "{{ .Keywords }}",
-				"imdb":         "{{ .Query.IMDBID }}",
-				"season":       "{{ .Query.Season }}",
-				"ep":           "{{ .Query.Ep }}",
-				"douban":       "{{ .Query.DoubanID }}",
-				"missingFalse": "{{ if eq .Query.TMDBID .False }}none{{ else }}have{{ end }}",
+				"search": "{{ .Keywords }}",
+				"imdb":   "{{ .Query.IMDBID }}",
+				"season": "{{ .Query.Season }}",
+				"ep":     "{{ .Query.Ep }}",
+				"douban": "{{ .Query.DoubanID }}",
+				"tmdb":   "{{ .Query.TMDBID }}",
 			},
 		},
 	}}
 	got := SearchRequestWithOptions(d, SearchOptions{Keywords: "dune", IMDBID: "tt123", Season: "2", Episode: "3", DoubanID: "db1"})
-	if got.Inputs["search"] != "dune" || got.Inputs["imdb"] != "tt123" || got.Inputs["season"] != "2" || got.Inputs["ep"] != "3" || got.Inputs["douban"] != "db1" || got.Inputs["missingFalse"] != "none" {
+	if got.Inputs["search"] != "dune" || got.Inputs["imdb"] != "tt123" || got.Inputs["season"] != "2" || got.Inputs["ep"] != "3" || got.Inputs["douban"] != "db1" {
 		t.Fatalf("inputs=%#v", got.Inputs)
+	}
+	if _, ok := got.Inputs["tmdb"]; ok {
+		t.Fatalf("tmdb input should be omitted: %#v", got.Inputs)
 	}
 }
 
@@ -75,5 +78,17 @@ func TestSearchRequestWithOptionsRendersTemplatedMethod(t *testing.T) {
 	}
 	if got := SearchRequestWithOptions(d, SearchOptions{}).Method; got != "get" {
 		t.Fatalf("method = %q, want get", got)
+	}
+}
+
+func TestSearchRequestMarksQueryConsumedByTemplate(t *testing.T) {
+	d := &Definition{Config: map[string]string{}, Raw: map[string]any{
+		"search": map[string]any{"paths": []any{map[string]any{
+			"path": `get-posts{{ if .Keywords }}:keywords:{{ or .Query.IMDBID .Keywords }}{{ end }}`,
+		}}},
+	}}
+	got := SearchRequestWithOptions(d, SearchOptions{Keywords: "spicci"})
+	if !got.QueryInTemplate {
+		t.Fatalf("expected QueryInTemplate true: %#v", got)
 	}
 }

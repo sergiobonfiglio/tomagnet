@@ -8,3 +8,11 @@ func TestRenderQueryVariablesAndBooleans(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+func TestRenderSupportsOrAndCategoryRange(t *testing.T) {
+	got := Render(`get-posts/order:-a{{ range .Categories }}:category:{{ . }}{{ end }}{{ if or .Query.IMDBID .Keywords }}:keywords:{{ or .Query.IMDBID .Keywords }}{{ else }}:time:10D{{ end }}:paginate_by:100:format:json/`, nil, map[string]string{"Keywords": "spicci", "Categories": "Movies,TV"}, nil)
+	want := `get-posts/order:-a:category:Movies:category:TV:keywords:spicci:paginate_by:100:format:json/`
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+}

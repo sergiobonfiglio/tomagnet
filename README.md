@@ -6,7 +6,7 @@ It can fetch Cardigann/Jackett-style indexer definitions on demand, keep them in
 
 ## Version
 
-Current version: **0.3.4**
+Current version: **0.3.5**
 
 ```bash
 tomagnet --version
@@ -15,7 +15,7 @@ tomagnet --version
 ## Install
 
 ```bash
-go install github.com/sergiobonfiglio/tomagnet/cmd/tomagnet@v0.3.4
+go install github.com/sergiobonfiglio/tomagnet/cmd/tomagnet@v0.3.5
 ```
 
 Or build from a checkout:
@@ -74,21 +74,78 @@ Indexers protected by browser challenges are not supported at the moment. `tomag
 
 ## Library usage
 
-```go
-definition, err := tomagnet.LoadDefinition("./.tomaccio/definitions/yts.yml")
-if err != nil {
-    return err
-}
+The public Go API lives in `github.com/sergiobonfiglio/tomagnet/pkg/tomagnet`.
 
-resp := tomagnet.Search(ctx, tomagnet.SearchOptions{
-    Query: "dune",
-    Indexers: []tomagnet.Indexer{{
-        ID:         "yts",
-        BaseURL:    "auto",
-        Definition: definition,
-    }},
-})
+Main entry points:
+
+- `Search(ctx, SearchOptions)` runs an intent-based search.
+- `LoadDefinition(path)` loads a definition from disk.
+- `LoadDefinitionByID(id)` resolves and loads a locally available definition.
+- `SyncDefinitions()` refreshes the local public definitions cache.
+- `DefaultIndexers()` returns tomagnet's default public indexers.
+
+### Intent-based search
+
+`Search` takes a high-level `Query` rather than transport-specific request
+fields. Tomagnet inspects each definition, chooses the best supported mode, and
+omits unset optional parameters automatically.
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+
+    tomagnet "github.com/sergiobonfiglio/tomagnet/pkg/tomagnet"
+)
+
+func main() {
+    definition, err := tomagnet.LoadDefinition("./.tomagnet/definitions/yts.yml")
+    if err != nil {
+        panic(err)
+    }
+
+    resp := tomagnet.Search(context.Background(), tomagnet.SearchOptions{
+        Query: tomagnet.Query{
+            Movie: &tomagnet.MovieQuery{
+                Title:  "Dune",
+                Year:   2021,
+                IMDBID: "tt1160419",
+            },
+        },
+        Indexers: []tomagnet.Indexer{{
+            ID:         "yts",
+            BaseURL:    "auto",
+            Definition: definition,
+        }},
+        Limit: 20,
+    })
+
+    for _, err := range resp.Errors {
+        fmt.Printf("indexer %s failed: %s\n", err.Indexer, err.Message)
+    }
+    for _, result := range resp.Results {
+        fmt.Printf("%s -> %s\n", result.Title, result.MagnetURL)
+    }
+}
 ```
+
+### Search types
+
+- `Query.Text`: plain free-text search.
+- `Query.Movie`: movie-specific intent with `Title`, `Year`, `IMDBID`, `TMDBID`.
+- `Query.TV`: TV-specific intent with `Title`, `Year`, `Season`, `Episode`, and supported external ids.
+- `SearchOptions.Categories`: optional category filter passed to supporting indexers.
+- `SearchOptions.Indexers`: one or more indexers to query.
+- `SearchOptions.Limit`: per-indexer result limit.
+- `Response.Results`: normalized search hits.
+- `Response.Errors`: per-indexer failures; one indexer can fail while others succeed.
+
+### Definitions API
+
+If you need to inspect or build definitions programmatically, `Definition` and
+its exported nested structs mirror the YAML shape supported by the library.
 
 ## Development
 

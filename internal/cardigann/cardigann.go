@@ -23,11 +23,12 @@ type Definition struct {
 }
 
 type RequestSpec struct {
-	Method         string
-	Path           string
-	Inputs         map[string]string
-	Headers        map[string]string
-	FollowRedirect bool
+	Method          string
+	Path            string
+	Inputs          map[string]string
+	Headers         map[string]string
+	FollowRedirect  bool
+	QueryInTemplate bool
 }
 
 type SearchOptions struct {
@@ -120,6 +121,13 @@ func SearchRequestWithOptions(d *Definition, opt SearchOptions) RequestSpec {
 		mergeRendered(inputs, mapAny(search["inputs"]), d.Config, q, nil)
 	}
 	mergeRendered(inputs, mapAny(pathMap["inputs"]), d.Config, q, nil)
+	if !AllowEmptyInputs(d) {
+		for k, v := range inputs {
+			if strings.TrimSpace(v) == "" {
+				delete(inputs, k)
+			}
+		}
+	}
 	headers := map[string]string{}
 	for k, v := range mapAny(search["headers"]) {
 		if ss := slice(v); len(ss) > 0 {
@@ -131,7 +139,8 @@ func SearchRequestWithOptions(d *Definition, opt SearchOptions) RequestSpec {
 	if cookies := renderedCookies(mapAny(search["cookies"]), d.Config, q); cookies != "" {
 		headers["Cookie"] = cookies
 	}
-	return RequestSpec{Method: method, Path: Render(path, d.Config, q, nil), Inputs: inputs, Headers: headers, FollowRedirect: searchFollowRedirect(d, pathMap)}
+	queryInTemplate := usesQueryTemplate(path) || usesQueryTemplate(search["inputs"]) || usesQueryTemplate(pathMap["inputs"])
+	return RequestSpec{Method: method, Path: Render(path, d.Config, q, nil), Inputs: inputs, Headers: headers, FollowRedirect: searchFollowRedirect(d, pathMap), QueryInTemplate: queryInTemplate}
 }
 
 func buildQueryMap(opt SearchOptions, keywords string) map[string]string {
@@ -158,11 +167,7 @@ func buildQueryMap(opt SearchOptions, keywords string) map[string]string {
 		"Type":        opt.Mode,
 		"Mode":        opt.Mode,
 	}
-	for _, k := range []string{"Season", "Ep", "Episode", "IMDBID", "TMDBID", "TVDBID", "DoubanID", "TVMazeID", "Artist", "Album", "Author", "Title", "Genre", "Year", "Type", "Mode"} {
-		if q[k] == "" {
-			q[k] = "false"
-		}
-	}
+	return q
 	return q
 }
 
@@ -384,6 +389,24 @@ func QueryParamForMode(d *Definition, mode string) string {
 
 func AllowEmptyInputs(d *Definition) bool {
 	return fmt.Sprint(dotted(d.Raw, "search.allowEmptyInputs")) == "true"
+}
+
+func usesQueryTemplate(v any) bool {
+	s := strings.TrimSpace(anyString(v))
+	if s != "" {
+		return strings.Contains(s, ".Keywords") || strings.Contains(s, ".Query")
+	}
+	for _, item := range slice(v) {
+		if usesQueryTemplate(item) {
+			return true
+		}
+	}
+	for _, item := range mapAny(v) {
+		if usesQueryTemplate(item) {
+			return true
+		}
+	}
+	return false
 }
 
 func ResultsSelector(d *Definition) string {
@@ -944,6 +967,17 @@ func Render(t string, cfg, query, result map[string]string) string {
 			break
 		}
 	}
+	reRangeCategories := regexp.MustCompile(`(?s){{\s*range\s+\.Categories\s*}}(.*?){{\s*end\s*}}`)
+	t = reRangeCategories.ReplaceAllStringFunc(t, func(block string) string {
+		m := reRangeCategories.FindStringSubmatch(block)
+		var out strings.Builder
+		for _, category := range splitCSV(query["Categories"]) {
+			part := strings.ReplaceAll(m[1], "{{ . }}", category)
+			part = strings.ReplaceAll(part, "{{.}}", category)
+			out.WriteString(part)
+		}
+		return out.String()
+	})
 	reJoin := regexp.MustCompile(`{{\s*join\s+\.Categories\s+"([^"]*)"\s*}}`)
 	t = reJoin.ReplaceAllStringFunc(t, func(tag string) string {
 		m := reJoin.FindStringSubmatch(tag)
@@ -957,6 +991,26 @@ func Render(t string, cfg, query, result map[string]string) string {
 }
 
 func renderExpr(expr string, cfg, query, result map[string]string) string {
+	if parts := splitExpr(expr); len(parts) > 1 {
+		switch parts[0] {
+		case "or":
+			for _, part := range parts[1:] {
+				if v := value(part, cfg, query, result); truthy(v) {
+					return v
+				}
+			}
+			return ""
+		case "and":
+			last := ""
+			for _, part := range parts[1:] {
+				last = value(part, cfg, query, result)
+				if !truthy(last) {
+					return ""
+				}
+			}
+			return last
+		}
+	}
 	if m := regexp.MustCompile(`^re_replace\s+([^\s]+)\s+"([^"]*)"\s+"([^"]*)"$`).FindStringSubmatch(expr); len(m) == 4 {
 		val := value(m[1], cfg, query, result)
 		if re, err := regexp.Compile(m[2]); err == nil {
