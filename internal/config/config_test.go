@@ -70,3 +70,17 @@ indexers:
 		t.Fatal("expected disabled indexer error")
 	}
 }
+
+func TestEnabledFiltersOnlyRequestedIndexers(t *testing.T) {
+	c := &Config{Indexers: []Indexer{{ID: "therarbg"}, {ID: "bitmagnet"}, {ID: "btdig"}}}
+	if err := normalize(c); err != nil {
+		t.Fatal(err)
+	}
+	idx, err := c.Enabled([]string{"therarbg"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(idx) != 1 || idx[0].ID != "therarbg" {
+		t.Fatalf("got %#v want only therarbg", idx)
+	}
+}

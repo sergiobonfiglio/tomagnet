@@ -88,6 +88,7 @@ func (c *Config) Enabled(ids []string) ([]Indexer, error) {
 	for _, id := range ids {
 		want[id] = true
 	}
+	filtering := len(want) > 0
 	disabled := map[string]bool{}
 	for _, id := range c.DisabledIndexers {
 		disabled[id] = true
@@ -97,7 +98,7 @@ func (c *Config) Enabled(ids []string) ([]Indexer, error) {
 		if disabled[idx.ID] {
 			continue
 		}
-		if len(want) == 0 || want[idx.ID] {
+		if !filtering || want[idx.ID] {
 			out = append(out, idx)
 			delete(want, idx.ID)
 		}
