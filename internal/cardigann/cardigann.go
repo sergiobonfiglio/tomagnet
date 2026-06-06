@@ -168,7 +168,6 @@ func buildQueryMap(opt SearchOptions, keywords string) map[string]string {
 		"Mode":        opt.Mode,
 	}
 	return q
-	return q
 }
 
 func mergeRendered(dst map[string]string, src map[string]any, cfg, query, result map[string]string) {

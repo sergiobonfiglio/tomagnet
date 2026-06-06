@@ -84,11 +84,27 @@ func normalize(c *Config) error {
 }
 
 func (c *Config) Enabled(ids []string) ([]Indexer, error) {
-	want := map[string]bool{}
-	for _, id := range ids {
-		want[id] = true
+	if len(ids) > 0 {
+		byID := map[string]Indexer{}
+		for _, idx := range c.Indexers {
+			byID[idx.ID] = idx
+		}
+		out := make([]Indexer, 0, len(ids))
+		seen := map[string]bool{}
+		for _, id := range ids {
+			if seen[id] {
+				continue
+			}
+			seen[id] = true
+			if idx, ok := byID[id]; ok {
+				out = append(out, idx)
+				continue
+			}
+			out = append(out, Indexer{ID: id, TimeoutSeconds: c.DefaultTimeoutSeconds, BaseURL: "auto"})
+		}
+		return out, nil
 	}
-	filtering := len(want) > 0
+
 	disabled := map[string]bool{}
 	for _, id := range c.DisabledIndexers {
 		disabled[id] = true
@@ -98,16 +114,7 @@ func (c *Config) Enabled(ids []string) ([]Indexer, error) {
 		if disabled[idx.ID] {
 			continue
 		}
-		if !filtering || want[idx.ID] {
-			out = append(out, idx)
-			delete(want, idx.ID)
-		}
-	}
-	for id := range want {
-		if disabled[id] {
-			return nil, fmt.Errorf("indexer %q disabled", id)
-		}
-		return nil, fmt.Errorf("indexer %q not configured", id)
+		out = append(out, idx)
 	}
 	return out, nil
 }

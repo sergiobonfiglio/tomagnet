@@ -66,8 +66,12 @@ indexers:
 	if len(idx) != 1 || idx[0].ID != "1337x" {
 		t.Fatalf("got %#v want only 1337x", idx)
 	}
-	if _, err := c.Enabled([]string{"yts"}); err == nil {
-		t.Fatal("expected disabled indexer error")
+	idx, err = c.Enabled([]string{"yts"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(idx) != 1 || idx[0].ID != "yts" {
+		t.Fatalf("got %#v want only yts", idx)
 	}
 }
 
@@ -82,5 +86,22 @@ func TestEnabledFiltersOnlyRequestedIndexers(t *testing.T) {
 	}
 	if len(idx) != 1 || idx[0].ID != "therarbg" {
 		t.Fatalf("got %#v want only therarbg", idx)
+	}
+}
+
+func TestEnabledSynthesizesExplicitIndexerNotInConfig(t *testing.T) {
+	c := &Config{DefaultTimeoutSeconds: 9, Indexers: []Indexer{{ID: "bitmagnet", BaseURL: "http://example"}}}
+	if err := normalize(c); err != nil {
+		t.Fatal(err)
+	}
+	idx, err := c.Enabled([]string{"therarbg"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(idx) != 1 {
+		t.Fatalf("got %#v want 1 indexer", idx)
+	}
+	if idx[0].ID != "therarbg" || idx[0].BaseURL != "auto" || idx[0].TimeoutSeconds != 9 {
+		t.Fatalf("got %#v want synthesized therarbg", idx[0])
 	}
 }
