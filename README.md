@@ -6,7 +6,7 @@ It can fetch Cardigann/Jackett-style indexer definitions on demand, keep them in
 
 ## Version
 
-Current version: **0.3.5**
+Current version: **0.3.6**
 
 ```bash
 tomagnet --version
@@ -15,7 +15,7 @@ tomagnet --version
 ## Install
 
 ```bash
-go install github.com/sergiobonfiglio/tomagnet/cmd/tomagnet@v0.3.5
+go install github.com/sergiobonfiglio/tomagnet/cmd/tomagnet@v0.3.6
 ```
 
 Or build from a checkout:
@@ -33,7 +33,7 @@ tomagnet definitions sync
 # Search the default public indexers
 tomagnet search "dune" --output table
 
-# Search a specific configured indexer
+# Search a specific indexer, even if it is not in tomagnet.yaml
 tomagnet search "dune" --indexer nyaasi --limit 20 --output json
 
 # Smoke-test configured indexers
@@ -43,7 +43,7 @@ tomagnet test nyaasi
 
 ## Configuration
 
-`tomagnet.yaml` is optional. Without it, searches use the default public indexers: `yts`, `limetorrents`, and `thepiratebay`.
+`tomagnet.yaml` is optional. Without it, searches use the default public indexers: `btdig`, `yts`, `limetorrents`, and `thepiratebay`.
 
 Create a local config from the example if you need custom settings:
 
@@ -70,7 +70,7 @@ indexers:
 
 Definitions resolve from `./definitions/<id>.yml|yaml`, then `./.tomagnet/definitions/<id>.yml|yaml`.
 
-Indexers protected by browser challenges are not supported at the moment. `tomagnet` currently treats these as unsupported and tries to detect them using the Cardigann `info_flaresolverr` hint plus a small set of response-body heuristics. This is best-effort detection, not full browser challenge support.
+When `--indexer` is provided explicitly, tomagnet will use those ids even if they are not present in `tomagnet.yaml`. Matching config entries still provide overrides such as `base_url` and `timeout_seconds`.
 
 ## Library usage
 

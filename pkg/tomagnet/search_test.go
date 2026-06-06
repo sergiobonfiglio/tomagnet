@@ -31,7 +31,7 @@ func TestDefaultIndexersExposeCurrentDefaults(t *testing.T) {
 			t.Fatalf("default indexer %q missing timeout", idx.ID)
 		}
 	}
-	if !slices.Equal(ids, []string{"yts", "limetorrents", "thepiratebay"}) {
+	if !slices.Equal(ids, []string{"btdig", "yts", "limetorrents", "thepiratebay"}) {
 		t.Fatalf("ids=%v", ids)
 	}
 }

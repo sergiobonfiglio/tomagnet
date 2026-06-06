@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.6
+
+Patch release.
+
+- Add local `btdig` definition support.
+- Use a `uTLS`-backed HTTPS transport with a Chrome-like ClientHello and HTTP/1.1 for indexers that reject the default Go client fingerprint.
+- Fix `--indexer` so explicit ids override config selection and can be used even when not present in `tomagnet.yaml`.
+- Add BTDig to the default public indexers list.
+- Fix BTDig size parsing and remove an unreachable `return` in query rendering.
+
 ## 0.3.1
 
 Patch release.
