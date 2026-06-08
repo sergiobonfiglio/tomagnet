@@ -227,10 +227,7 @@ func Run(ctx context.Context, opt Options) Response {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	for _, idx := range opt.Indexers {
-		idx := idx
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 			rs, err := runOne(ctx, idx, opt)
@@ -243,7 +240,7 @@ func Run(ctx context.Context, opt Options) Response {
 				resp.Results = append(resp.Results, rs...)
 				resp.Meta.IndexersSucceeded++
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	resp.Meta.TotalResults = len(resp.Results)
@@ -551,8 +548,8 @@ func parseJSON(indexer string, d *cardigann.Definition, s string, limit int) []R
 			if t := cardigann.FieldText(d, field, vars); t != "" {
 				val = t
 			} else if p := cardigann.FieldSelector(d, field); p != "" {
-				if strings.HasPrefix(p, "..") {
-					if x := row.parent.Get(strings.TrimPrefix(p, "..")); x.Exists() {
+				if after, ok := strings.CutPrefix(p, ".."); ok {
+					if x := row.parent.Get(after); x.Exists() {
 						val = x.String()
 					}
 				} else if x := row.item.Get(p); x.Exists() {
@@ -573,7 +570,7 @@ func parseJSON(indexer string, d *cardigann.Definition, s string, limit int) []R
 			val = cardigann.ApplyFilters(d, field, val, vars)
 			return cardigann.FieldCase(d, field, val)
 		}
-		for pass := 0; pass < 5; pass++ {
+		for range 5 {
 			changed := false
 			for _, f := range cardigann.FieldNames(d) {
 				v := get(f, f)

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.7
+
+Patch release.
+
+- Include tomagnet-bundled definitions such as `btdig` in `definitions sync`.
+- Run `go fix ./...` to modernize standard-library usage.
+
 ## 0.3.6
 
 Patch release.

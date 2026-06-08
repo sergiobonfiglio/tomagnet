@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -395,10 +396,8 @@ func usesQueryTemplate(v any) bool {
 	if s != "" {
 		return strings.Contains(s, ".Keywords") || strings.Contains(s, ".Query")
 	}
-	for _, item := range slice(v) {
-		if usesQueryTemplate(item) {
-			return true
-		}
+	if slices.ContainsFunc(slice(v), usesQueryTemplate) {
+		return true
 	}
 	for _, item := range mapAny(v) {
 		if usesQueryTemplate(item) {
@@ -695,10 +694,7 @@ func ApplyFilterList(d *Definition, filters []any, val string, result map[string
 				start, _ := strconv.Atoi(anyString(args[0]))
 				ln, _ := strconv.Atoi(anyString(args[1]))
 				if start >= 0 && start < len(val) {
-					end := start + ln
-					if end > len(val) {
-						end = len(val)
-					}
+					end := min(start+ln, len(val))
 					val = val[start:end]
 				}
 			}
@@ -877,8 +873,8 @@ func parseFuzzyTime(val string, now time.Time) (time.Time, bool) {
 		P string
 		D int
 	}{{"Yesterday ", -1}, {"Today ", 0}} {
-		if strings.HasPrefix(s, prefix.P) {
-			if tm, err := time.Parse("15:04", strings.TrimPrefix(s, prefix.P)); err == nil {
+		if after, ok := strings.CutPrefix(s, prefix.P); ok {
+			if tm, err := time.Parse("15:04", after); err == nil {
 				base := now.AddDate(0, 0, prefix.D)
 				return time.Date(base.Year(), base.Month(), base.Day(), tm.Hour(), tm.Minute(), 0, 0, time.UTC), true
 			}
@@ -1201,7 +1197,7 @@ func slice(v any) []any {
 }
 func dotted(m map[string]any, p string) any {
 	var cur any = m
-	for _, part := range strings.Split(p, ".") {
+	for part := range strings.SplitSeq(p, ".") {
 		mm := mapAny(cur)
 		cur = mm[part]
 		if cur == nil {

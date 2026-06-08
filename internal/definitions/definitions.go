@@ -1,12 +1,14 @@
 package definitions
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 )
@@ -17,6 +19,9 @@ const CacheDir = ".tomagnet/definitions"
 const UpstreamRef = "bbd0821c34afbc4c6a1d1b40760247f3bef5f20e"
 
 const apiURL = "https://api.github.com/repos/Jackett/Jackett/contents/src/Jackett.Common/Definitions?ref=" + UpstreamRef
+
+//go:embed bundled/*.yml
+var bundled embed.FS
 
 type Metadata struct {
 	SyncedAt  time.Time `json:"synced_at"`
@@ -79,6 +84,37 @@ func Sync() (Metadata, error) {
 		}
 		m.Files = append(m.Files, it.Name)
 	}
+	if err := syncBundled(&m); err != nil {
+		return m, err
+	}
 	b, _ := json.MarshalIndent(m, "", "  ")
 	return m, os.WriteFile(filepath.Join(CacheDir, "index.json"), b, 0o644)
+}
+
+func syncBundled(m *Metadata) error {
+	entries, err := bundled.ReadDir("bundled")
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		content, err := bundled.ReadFile(filepath.Join("bundled", entry.Name()))
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(CacheDir, entry.Name()), content, 0o644); err != nil {
+			return err
+		}
+		m.Files = appendUnique(m.Files, entry.Name())
+	}
+	return nil
+}
+
+func appendUnique(values []string, value string) []string {
+	if slices.Contains(values, value) {
+		return values
+	}
+	return append(values, value)
 }

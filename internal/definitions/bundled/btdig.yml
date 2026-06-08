@@ -1,0 +1,74 @@
+---
+id: btdig
+name: BTDig
+description: "BTDig is a public DHT crawler"
+language: en-US
+type: public
+encoding: UTF-8
+links:
+  - https://btdig.com/
+
+caps:
+  categorymappings:
+    - {id: Other, cat: Other, desc: Other}
+
+  modes:
+    search: [q]
+    tv-search: [q, season, ep]
+    movie-search: [q]
+    music-search: [q]
+    book-search: [q]
+
+search:
+  path: search
+  inputs:
+    q: "{{ if .Keywords }}{{ .Keywords }}{{ else }}{{ .Today.Year }}{{ end }}"
+    order: "0"
+  headers:
+    User-Agent: Wget/1.25.0
+    Accept: "*/*"
+    Accept-Encoding: identity
+    Connection: Keep-Alive
+
+  rows:
+    selector: div.one_result
+
+  error:
+    - selector: h1:contains("One more step")
+      message:
+        selector: h2
+
+  fields:
+    category:
+      text: Other
+    title:
+      selector: div.torrent_name a
+    details:
+      selector: div.torrent_name a
+      attribute: href
+    download:
+      selector: div.torrent_magnet a[href^="magnet:?xt="]
+      attribute: href
+      filters:
+        - name: htmldecode
+    date:
+      selector: span.torrent_age
+      filters:
+        - name: replace
+          args: ["found ", ""]
+        - name: timeago
+    size:
+      selector: span.torrent_size
+      filters:
+        - name: htmldecode
+        - name: replace
+          args: [" ", " "]
+        - name: trim
+    seeders:
+      text: 1
+    leechers:
+      text: 1
+    downloadvolumefactor:
+      text: 0
+    uploadvolumefactor:
+      text: 1

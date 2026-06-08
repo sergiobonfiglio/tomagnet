@@ -27,7 +27,7 @@ go build -o tomagnet ./cmd/tomagnet
 ## Quick start
 
 ```bash
-# Fetch indexer definitions into ./.tomagnet/definitions
+# Fetch Jackett and bundled indexer definitions into ./.tomagnet/definitions
 tomagnet definitions sync
 
 # Search the default public indexers
@@ -68,7 +68,7 @@ indexers:
     base_url: "https://1337x.to/"
 ```
 
-Definitions resolve from `./definitions/<id>.yml|yaml`, then `./.tomagnet/definitions/<id>.yml|yaml`.
+Definitions resolve from `./definitions/<id>.yml|yaml`, then `./.tomagnet/definitions/<id>.yml|yaml`. `tomagnet definitions sync` writes both synced Jackett definitions and tomagnet-bundled definitions such as `btdig` into the local cache.
 
 When `--indexer` is provided explicitly, tomagnet will use those ids even if they are not present in `tomagnet.yaml`. Matching config entries still provide overrides such as `base_url` and `timeout_seconds`.
 

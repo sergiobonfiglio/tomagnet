@@ -1,6 +1,7 @@
 package search
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -48,12 +49,7 @@ func matchesSelector(node *goquery.Selection, sel string) bool {
 	if parent.Length() == 0 {
 		parent = goquery.NewDocumentFromNode(node.Nodes[0]).Selection
 	}
-	for _, n := range selectNodes(parent, sel).Nodes {
-		if n == node.Nodes[0] {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(selectNodes(parent, sel).Nodes, node.Nodes[0])
 }
 
 func emptySelection(scope *goquery.Selection) *goquery.Selection {

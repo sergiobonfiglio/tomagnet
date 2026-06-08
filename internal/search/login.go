@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -104,9 +105,7 @@ func mergeCookies(dst, src map[string]string) map[string]string {
 	if dst == nil {
 		dst = map[string]string{}
 	}
-	for k, v := range src {
-		dst[k] = v
-	}
+	maps.Copy(dst, src)
 	return dst
 }
 
