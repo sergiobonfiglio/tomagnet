@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.8
+
+Patch release.
+
+- Add cache-dir-aware definition sync and load APIs for wrapper CLIs.
+
 ## 0.3.7
 
 Patch release.

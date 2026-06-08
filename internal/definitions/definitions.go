@@ -31,7 +31,11 @@ type Metadata struct {
 }
 
 func Resolve(id string) (string, error) {
-	for _, p := range []string{filepath.Join("definitions", id+".yml"), filepath.Join("definitions", id+".yaml"), filepath.Join(CacheDir, id+".yml"), filepath.Join(CacheDir, id+".yaml")} {
+	return ResolveIn(id, CacheDir)
+}
+
+func ResolveIn(id, cacheDir string) (string, error) {
+	for _, p := range []string{filepath.Join("definitions", id+".yml"), filepath.Join("definitions", id+".yaml"), filepath.Join(cacheDir, id+".yml"), filepath.Join(cacheDir, id+".yaml")} {
 		if st, err := os.Stat(p); err == nil && !st.IsDir() {
 			return p, nil
 		}
@@ -40,6 +44,10 @@ func Resolve(id string) (string, error) {
 }
 
 func Sync() (Metadata, error) {
+	return SyncTo(CacheDir)
+}
+
+func SyncTo(cacheDir string) (Metadata, error) {
 	resp, err := http.Get(apiURL)
 	if err != nil {
 		return Metadata{}, err
@@ -55,7 +63,7 @@ func Sync() (Metadata, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
 		return Metadata{}, err
 	}
-	if err := os.MkdirAll(CacheDir, 0o755); err != nil {
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		return Metadata{}, err
 	}
 	m := Metadata{SyncedAt: time.Now().UTC(), SourceURL: apiURL, SourceRef: UpstreamRef}
@@ -79,19 +87,19 @@ func Sync() (Metadata, error) {
 		if err != nil {
 			return m, err
 		}
-		if err := os.WriteFile(filepath.Join(CacheDir, it.Name), b, 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(cacheDir, it.Name), b, 0o644); err != nil {
 			return m, err
 		}
 		m.Files = append(m.Files, it.Name)
 	}
-	if err := syncBundled(&m); err != nil {
+	if err := syncBundled(cacheDir, &m); err != nil {
 		return m, err
 	}
 	b, _ := json.MarshalIndent(m, "", "  ")
-	return m, os.WriteFile(filepath.Join(CacheDir, "index.json"), b, 0o644)
+	return m, os.WriteFile(filepath.Join(cacheDir, "index.json"), b, 0o644)
 }
 
-func syncBundled(m *Metadata) error {
+func syncBundled(cacheDir string, m *Metadata) error {
 	entries, err := bundled.ReadDir("bundled")
 	if err != nil {
 		return err
@@ -104,7 +112,7 @@ func syncBundled(m *Metadata) error {
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(filepath.Join(CacheDir, entry.Name()), content, 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(cacheDir, entry.Name()), content, 0o644); err != nil {
 			return err
 		}
 		m.Files = appendUnique(m.Files, entry.Name())

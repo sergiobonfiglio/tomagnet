@@ -18,19 +18,20 @@ func TestSyncBundledWritesBTDigDefinition(t *testing.T) {
 		t.Fatalf("Chdir() error = %v", err)
 	}
 	t.Cleanup(func() { _ = os.Chdir(cwd) })
-	if err := os.MkdirAll(CacheDir, 0o755); err != nil {
+	cacheDir := filepath.Join(".custom", "definitions")
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
 
 	metadata := Metadata{Files: []string{"yts.yml"}}
-	if err := syncBundled(&metadata); err != nil {
+	if err := syncBundled(cacheDir, &metadata); err != nil {
 		t.Fatalf("syncBundled() error = %v", err)
 	}
 	if !slices.Contains(metadata.Files, "btdig.yml") {
 		t.Fatalf("metadata files = %v, want btdig.yml", metadata.Files)
 	}
 
-	content, err := os.ReadFile(filepath.Join(CacheDir, "btdig.yml"))
+	content, err := os.ReadFile(filepath.Join(cacheDir, "btdig.yml"))
 	if err != nil {
 		t.Fatalf("ReadFile(btdig.yml) error = %v", err)
 	}
@@ -49,12 +50,13 @@ func TestSyncBundledDoesNotDuplicateMetadataFiles(t *testing.T) {
 		t.Fatalf("Chdir() error = %v", err)
 	}
 	t.Cleanup(func() { _ = os.Chdir(cwd) })
-	if err := os.MkdirAll(CacheDir, 0o755); err != nil {
+	cacheDir := filepath.Join(".custom", "definitions")
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
 
 	metadata := Metadata{Files: []string{"btdig.yml"}}
-	if err := syncBundled(&metadata); err != nil {
+	if err := syncBundled(cacheDir, &metadata); err != nil {
 		t.Fatalf("syncBundled() error = %v", err)
 	}
 	count := 0
