@@ -344,8 +344,6 @@ func ResponseType(d *Definition) string {
 	return ""
 }
 
-func QueryParam(d *Definition) string { return QueryParamForMode(d, "search") }
-
 func ModeParamNames(d *Definition, mode string) []string {
 	caps := mapAny(d.Raw["caps"])
 	modes := mapAny(caps["modes"])

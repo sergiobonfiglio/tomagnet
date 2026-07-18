@@ -54,10 +54,6 @@ func NewSession(timeout time.Duration, debug func(string, ...any), certificates 
 	return &Session{timeout: timeout, debug: debug, jar: jar, certificates: allowed}
 }
 
-func Get(ctx context.Context, base, path, param, query string, timeout time.Duration, debug func(string, ...any)) (Response, error) {
-	return Do(ctx, Request{Method: http.MethodGet, Base: base, Path: path, Param: param, Query: query}, timeout, debug)
-}
-
 func Do(ctx context.Context, spec Request, timeout time.Duration, debug func(string, ...any)) (Response, error) {
 	return NewSession(timeout, debug).Do(ctx, spec)
 }
