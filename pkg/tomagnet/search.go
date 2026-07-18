@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sergiobonfiglio/tomagnet/internal/cardigann"
@@ -22,7 +23,7 @@ type Indexer struct {
 	// BaseURL overrides the definition base URL. Use "auto" to let tomagnet
 	// choose from the definition's known links.
 	BaseURL string
-	// TimeoutSeconds overrides the request timeout for this indexer.
+	// TimeoutSeconds overrides the request timeout for this indexer. Zero or negative values use the default.
 	TimeoutSeconds int
 	// Definition provides the already loaded definition to use. If nil, Search
 	// loads the definition by ID via LoadDefinitionByID.
@@ -193,34 +194,59 @@ func Search(ctx context.Context, opt SearchOptions) Response {
 			IndexersRequested: len(opt.Indexers),
 		},
 	}
-
-	for _, idx := range opt.Indexers {
-		definition := idx.Definition
-		if definition == nil {
-			var err error
-			definition, err = LoadDefinitionByID(idx.ID)
-			if err != nil {
-				out.Errors = append(out.Errors, Error{Indexer: idx.ID, Stage: "definition", Message: err.Error()})
-				continue
-			}
-		}
-
-		planned := planSearch(definition, opt.Query, opt.Categories)
-		planned.Indexers = []internalconfig.Indexer{{ID: idx.ID, BaseURL: idx.BaseURL, TimeoutSeconds: idx.TimeoutSeconds}}
-		planned.Definitions = map[string]*cardigann.Definition{idx.ID: definition.cardigann()}
-		planned.Limit = opt.Limit
-		planned.Concurrency = 1
-		planned.Debug = opt.Debug
-
-		r := internalsearch.Run(ctx, planned)
-		appendResults(&out, r)
+	if opt.Concurrency <= 0 {
+		opt.Concurrency = internalconfig.Default().Concurrency
 	}
 
+	responses := make([]internalsearch.Response, len(opt.Indexers))
+	definitionErrors := make([]*Error, len(opt.Indexers))
+	sem := make(chan struct{}, opt.Concurrency)
+	var wg sync.WaitGroup
+	for i, idx := range opt.Indexers {
+		wg.Go(func() {
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			definition := idx.Definition
+			if definition == nil {
+				var err error
+				definition, err = LoadDefinitionByID(idx.ID)
+				if err != nil {
+					definitionErrors[i] = &Error{Indexer: idx.ID, Stage: "definition", Message: err.Error()}
+					return
+				}
+			}
+
+			planned := planSearch(definition, opt.Query, opt.Categories)
+			planned.Indexers = []internalconfig.Indexer{{ID: idx.ID, BaseURL: idx.BaseURL, TimeoutSeconds: timeoutSeconds(idx.TimeoutSeconds)}}
+			planned.Definitions = map[string]*cardigann.Definition{idx.ID: definition.cardigann()}
+			planned.Limit = opt.Limit
+			planned.Concurrency = 1
+			planned.Debug = opt.Debug
+			responses[i] = internalsearch.Run(ctx, planned)
+		})
+	}
+	wg.Wait()
+
+	for i := range opt.Indexers {
+		if definitionErrors[i] != nil {
+			out.Errors = append(out.Errors, *definitionErrors[i])
+			continue
+		}
+		appendResults(&out, responses[i])
+	}
 	out.Meta.IndexersFailed = len(out.Errors)
 	out.Meta.IndexersSucceeded = out.Meta.IndexersRequested - out.Meta.IndexersFailed
 	out.Meta.TotalResults = len(out.Results)
 	out.Meta.DurationMS = time.Since(startedAt).Milliseconds()
 	return out
+}
+
+func timeoutSeconds(value int) int {
+	if value > 0 {
+		return value
+	}
+	return internalconfig.Default().DefaultTimeoutSeconds
 }
 
 func appendResults(out *Response, in internalsearch.Response) {

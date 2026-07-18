@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.9
+
+Patch release.
+
+- Honor the public search concurrency setting and apply a 30-second default request timeout.
+
 ## 0.3.8
 
 Patch release.

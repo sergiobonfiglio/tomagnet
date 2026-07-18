@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"sync"
 	"testing"
+	"time"
 )
 
 func TestSearchOptionsExposeIntentBasedQueryFields(t *testing.T) {
@@ -160,5 +162,62 @@ func TestSearchMovieQueryFallsBackToGenericSearchWhenSpecificModeNeedsMissingPar
 	}
 	if gotQuery != "Dune 2024" {
 		t.Fatalf("query=%q", gotQuery)
+	}
+}
+
+func TestSearchHonorsConcurrency(t *testing.T) {
+	started := make(chan struct{}, 2)
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	releaseAll := func() { releaseOnce.Do(func() { close(release) }) }
+	t.Cleanup(releaseAll)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		started <- struct{}{}
+		select {
+		case <-release:
+		case <-r.Context().Done():
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"results":[]}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	definition := &Definition{
+		Name:    "Custom",
+		BaseURL: srv.URL,
+		Search:  SearchDefinition{Path: "/", Rows: RowsDefinition{Selector: "results"}},
+	}
+	completed := make(chan Response, 1)
+	go func() {
+		completed <- Search(context.Background(), SearchOptions{
+			Query:       Query{Text: "dune"},
+			Concurrency: 2,
+			Indexers: []Indexer{
+				{ID: "one", Definition: definition},
+				{ID: "two", Definition: definition},
+			},
+		})
+	}()
+
+	for range 2 {
+		select {
+		case <-started:
+		case <-time.After(time.Second):
+			t.Fatal("search did not start both indexers concurrently")
+		}
+	}
+	releaseAll()
+	if response := <-completed; len(response.Errors) != 0 {
+		t.Fatalf("errors: %#v", response.Errors)
+	}
+}
+
+func TestTimeoutSecondsUsesDefault(t *testing.T) {
+	if got := timeoutSeconds(0); got != 30 {
+		t.Fatalf("timeoutSeconds(0) = %d, want 30", got)
+	}
+	if got := timeoutSeconds(7); got != 7 {
+		t.Fatalf("timeoutSeconds(7) = %d, want 7", got)
 	}
 }

@@ -1,4 +1,4 @@
-default_timeout_seconds: 15
+default_timeout_seconds: 30
 concurrency: 4
 # Used by default/auto selection.
 disabled_indexers:

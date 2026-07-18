@@ -36,8 +36,8 @@ func TestLoadMissingDefaultConfigUsesTopPublicIndexers(t *testing.T) {
 		if idx[i].BaseURL != "auto" {
 			t.Fatalf("indexer %q base url got %q want auto", idx[i].ID, idx[i].BaseURL)
 		}
-		if idx[i].TimeoutSeconds != 15 {
-			t.Fatalf("indexer %q timeout got %d want 15", idx[i].ID, idx[i].TimeoutSeconds)
+		if idx[i].TimeoutSeconds != 30 {
+			t.Fatalf("indexer %q timeout got %d want 30", idx[i].ID, idx[i].TimeoutSeconds)
 		}
 	}
 }

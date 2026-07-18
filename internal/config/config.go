@@ -58,7 +58,7 @@ func Default() Config {
 
 func normalize(c *Config) error {
 	if c.DefaultTimeoutSeconds <= 0 {
-		c.DefaultTimeoutSeconds = 15
+		c.DefaultTimeoutSeconds = 30
 	}
 	if c.Concurrency <= 0 {
 		c.Concurrency = 4

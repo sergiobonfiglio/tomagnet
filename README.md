@@ -6,7 +6,7 @@ It can fetch Cardigann/Jackett-style indexer definitions on demand, keep them in
 
 ## Version
 
-Current version: **0.3.6**
+Current version: **0.3.9**
 
 ```bash
 tomagnet --version
@@ -15,7 +15,7 @@ tomagnet --version
 ## Install
 
 ```bash
-go install github.com/sergiobonfiglio/tomagnet/cmd/tomagnet@v0.3.6
+go install github.com/sergiobonfiglio/tomagnet/cmd/tomagnet@v0.3.9
 ```
 
 Or build from a checkout:
@@ -54,7 +54,7 @@ cp tomagnet.example.yaml tomagnet.yaml
 Example:
 
 ```yaml
-default_timeout_seconds: 15
+default_timeout_seconds: 30
 concurrency: 4
 # Used by default/auto selection.
 disabled_indexers:
