@@ -27,6 +27,10 @@ func EnrichDetails(ctx context.Context, d *cardigann.Definition, rs []Result, fe
 		if err != nil {
 			continue
 		}
+		rawURL := *rs[i].DetailsURL
+		if rs[i].DownloadURL != nil {
+			rawURL = *rs[i].DownloadURL
+		}
 		if rs[i].MagnetURL == nil {
 			if v := detailValue(doc, d, "magnet"); v != "" {
 				rs[i].MagnetURL = &v
@@ -44,25 +48,33 @@ func EnrichDetails(ctx context.Context, d *cardigann.Definition, rs []Result, fe
 				rs[i].InfoHash = &ih
 			}
 		}
-		if needsBeforeResponse(d) {
-			rawURL := *rs[i].DetailsURL
-			if rs[i].DownloadURL != nil {
-				rawURL = *rs[i].DownloadURL
-			}
+		if cardigann.HasDownloadBefore(d) {
 			preq := buildDownloadBeforeRequest(d, rawURL, string(body))
 			if preq.Path != "" {
-				b2, _, err := fetcher(ctx, fetch.Request{Method: preq.Method, Base: d.BaseURL, Path: preq.Path, Inputs: preq.Inputs, Headers: preq.Headers, FollowRedirect: &preq.FollowRedirect})
+				beforeBody, _, err := fetcher(ctx, fetch.Request{Method: preq.Method, Base: d.BaseURL, Path: preq.Path, Inputs: preq.Inputs, Headers: preq.Headers, FollowRedirect: &preq.FollowRedirect})
 				if err == nil {
-					applyDownloadSelectors(&rs[i], d, string(b2), true)
+					applyDownloadSelectors(&rs[i], d, string(beforeBody), true)
 					if rs[i].InfoHash == nil && cardigann.DownloadInfoHashUsesBeforeResponse(d) {
-						if ih := downloadInfohashValue(string(b2), d, "hash", true); ih != "" {
+						if ih := downloadInfohashValue(string(beforeBody), d, "hash", true); ih != "" {
 							rs[i].InfoHash = &ih
 						}
 					}
 					if rs[i].MagnetURL == nil && rs[i].InfoHash != nil {
-						if title := downloadInfohashValue(string(b2), d, "title", true); title != "" {
+						if title := downloadInfohashValue(string(beforeBody), d, "title", true); title != "" {
 							mag := "magnet:?xt=urn:btih:" + *rs[i].InfoHash + "&dn=" + url.QueryEscape(title)
 							rs[i].MagnetURL = &mag
+						}
+					}
+					if needsDownloadPageAfterBefore(d) {
+						refreshedBody, _, err := fetcher(ctx, fetch.Request{Method: "get", Base: d.BaseURL, Path: rawURL, FollowRedirect: &fr})
+						if err == nil {
+							body = refreshedBody
+							applyDownloadSelectors(&rs[i], d, string(body), false)
+							if rs[i].InfoHash == nil && !cardigann.DownloadInfoHashUsesBeforeResponse(d) {
+								if ih := downloadInfohashValue(string(body), d, "hash", false); ih != "" {
+									rs[i].InfoHash = &ih
+								}
+							}
 						}
 					}
 				}
@@ -83,7 +95,7 @@ func shouldEnrichDetails(d *cardigann.Definition, r Result) bool {
 	if r.DetailsURL == nil {
 		return false
 	}
-	if needsBeforeResponse(d) {
+	if cardigann.HasDownloadBefore(d) {
 		return true
 	}
 	if r.MagnetURL == nil && cardigann.DetailFieldSelector(d, "magnet") != "" {
@@ -101,12 +113,12 @@ func shouldEnrichDetails(d *cardigann.Definition, r Result) bool {
 	return false
 }
 
-func needsBeforeResponse(d *cardigann.Definition) bool {
-	if cardigann.DownloadInfoHashUsesBeforeResponse(d) {
+func needsDownloadPageAfterBefore(d *cardigann.Definition) bool {
+	if cardigann.DownloadInfoHashSelector(d, "hash").Selector != "" && !cardigann.DownloadInfoHashUsesBeforeResponse(d) {
 		return true
 	}
 	for _, sel := range cardigann.DownloadSelectors(d) {
-		if sel.UseBeforeResponse {
+		if !sel.UseBeforeResponse {
 			return true
 		}
 	}

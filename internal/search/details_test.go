@@ -76,6 +76,51 @@ func TestEnrichDetailsUsesDownloadInfohashSelectors(t *testing.T) {
 	}
 }
 
+func TestEnrichDetailsRefetchesDownloadPageAfterBeforeRequest(t *testing.T) {
+	d := &cardigann.Definition{BaseURL: "https://idx.test", Config: map[string]string{}, Raw: map[string]any{"download": map[string]any{
+		"before": map[string]any{
+			"pathselector": map[string]any{"selector": "a.thanks", "attribute": "href"},
+		},
+		"selectors": []any{
+			map[string]any{
+				"selector": "script:contains(addLinkToDocument)",
+				"filters": []any{
+					map[string]any{"name": "regexp", "args": `addLinkToDocument\("(.*?)"`},
+					map[string]any{"name": "prepend", "args": "magnet:?xt=urn:btih:"},
+				},
+			},
+		},
+	}}}
+	details := "https://idx.test/topic/1"
+	r := Result{Indexer: "idx", DetailsURL: &details, DownloadURL: &details}
+	thanked := false
+	detailRequests := 0
+	fetcher := func(ctx context.Context, req fetch.Request) ([]byte, string, error) {
+		switch req.Path {
+		case details:
+			detailRequests++
+			if thanked {
+				return []byte(`<script>addLinkToDocument("ABC123")</script>`), "text/html", nil
+			}
+			return []byte(`<a class="thanks" href="/thanks/1"></a>`), "text/html", nil
+		case "/thanks/1":
+			thanked = true
+			return []byte(`<html></html>`), "text/html", nil
+		default:
+			t.Fatalf("unexpected req: %#v", req)
+			return nil, "", nil
+		}
+	}
+
+	got := EnrichDetails(context.Background(), d, []Result{r}, fetcher)
+	if detailRequests != 2 {
+		t.Fatalf("detail requests = %d, want 2", detailRequests)
+	}
+	if got[0].MagnetURL == nil || *got[0].MagnetURL != "magnet:?xt=urn:btih:ABC123" {
+		t.Fatalf("unexpected: %#v", got[0])
+	}
+}
+
 func TestEnrichDetailsUsesBeforeResponseDownloadSelector(t *testing.T) {
 	d := &cardigann.Definition{BaseURL: "https://idx.test", Config: map[string]string{}, Raw: map[string]any{"download": map[string]any{
 		"before": map[string]any{

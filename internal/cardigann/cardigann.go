@@ -553,6 +553,10 @@ func DownloadInfoHashUsesBeforeResponse(d *Definition) bool {
 	return fmt.Sprint(dotted(d.Raw, "download.infohash.usebeforeresponse")) == "true"
 }
 
+func HasDownloadBefore(d *Definition) bool {
+	return len(mapAny(dotted(d.Raw, "download.before"))) > 0
+}
+
 func DownloadBeforePathSelector(d *Definition) SelectorSpec {
 	return selectorSpec(d, dotted(d.Raw, "download.before.pathselector"))
 }

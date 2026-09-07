@@ -412,7 +412,9 @@ func runOneBase(ctx context.Context, d *cardigann.Definition, idx config.Indexer
 	if err != nil {
 		return nil, fmt.Errorf("request: %w", err)
 	}
-	rs, err := Parse(idx.ID, d, fr.Body, fr.ContentType, opt.Limit)
+	parseDefinition := *d
+	parseDefinition.BaseURL = fr.URL
+	rs, err := Parse(idx.ID, &parseDefinition, fr.Body, fr.ContentType, opt.Limit)
 	if err != nil {
 		return nil, fmt.Errorf("parse: %w", err)
 	}
