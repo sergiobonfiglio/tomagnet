@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net/url"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -12,7 +13,7 @@ import (
 	"github.com/sergiobonfiglio/tomagnet/internal/fetch"
 )
 
-func buildLoginRequest(d *cardigann.Definition, page string) cardigann.RequestSpec {
+func buildLoginRequest(d *cardigann.Definition, page, pageURL string) cardigann.RequestSpec {
 	spec := cardigann.LoginRequest(d)
 	formSel := cardigann.LoginFormSelector(d)
 	submitPath := cardigann.LoginSubmitPath(d)
@@ -24,9 +25,6 @@ func buildLoginRequest(d *cardigann.Definition, page string) cardigann.RequestSp
 		spec.Method = "post"
 	}
 	if strings.TrimSpace(page) == "" {
-		if spec.Method == "form" {
-			spec.Method = "post"
-		}
 		if submitPath != "" {
 			spec.Path = submitPath
 		}
@@ -39,14 +37,16 @@ func buildLoginRequest(d *cardigann.Definition, page string) cardigann.RequestSp
 		}
 		return spec
 	}
+
 	scope := doc.Selection
+	var form *goquery.Selection
 	if formSel != "" {
-		form := selectNodes(doc.Selection, formSel).First()
+		form = selectNodes(doc.Selection, formSel).First()
 		if form.Length() > 0 {
 			scope = form
 			if submitPath == "" {
 				if action, ok := form.Attr("action"); ok && strings.TrimSpace(action) != "" {
-					spec.Path = action
+					spec.Path = resolveFormAction(pageURL, action)
 				}
 			}
 		}
@@ -54,25 +54,16 @@ func buildLoginRequest(d *cardigann.Definition, page string) cardigann.RequestSp
 	if submitPath != "" {
 		spec.Path = submitPath
 	}
+
+	configuredInputs := spec.Inputs
 	if cardigann.LoginUsesSelectors(d) {
-		resolved := map[string]string{}
-		for k, v := range spec.Inputs {
-			q := selectNodes(scope, k).First()
-			if q.Length() == 0 {
-				q = selectNodes(doc.Selection, k).First()
-			}
-			if q.Length() == 0 {
-				resolved[k] = v
-				continue
-			}
-			name, ok := q.Attr("name")
-			if !ok || strings.TrimSpace(name) == "" {
-				resolved[k] = v
-				continue
-			}
-			resolved[name] = v
-		}
-		spec.Inputs = resolved
+		configuredInputs = resolveLoginInputNames(configuredInputs, scope, doc.Selection)
+	}
+	if form != nil && form.Length() > 0 {
+		spec.Inputs = formInputs(form)
+		maps.Copy(spec.Inputs, configuredInputs)
+	} else {
+		spec.Inputs = configuredInputs
 	}
 	for _, name := range selectorNames {
 		sel := cardigann.LoginSelectorInputSelector(d, name)
@@ -95,6 +86,86 @@ func buildLoginRequest(d *cardigann.Definition, page string) cardigann.RequestSp
 		}
 	}
 	return spec
+}
+
+func resolveLoginInputNames(inputs map[string]string, scope, document *goquery.Selection) map[string]string {
+	resolved := map[string]string{}
+	for selector, value := range inputs {
+		q := selectNodes(scope, selector).First()
+		if q.Length() == 0 {
+			q = selectNodes(document, selector).First()
+		}
+		name, ok := q.Attr("name")
+		if q.Length() == 0 || !ok || strings.TrimSpace(name) == "" {
+			resolved[selector] = value
+			continue
+		}
+		resolved[name] = value
+	}
+	return resolved
+}
+
+func resolveFormAction(pageURL, action string) string {
+	base, err := url.Parse(pageURL)
+	if err != nil || !base.IsAbs() {
+		return action
+	}
+	reference, err := url.Parse(action)
+	if err != nil {
+		return action
+	}
+	return base.ResolveReference(reference).String()
+}
+
+func formInputs(form *goquery.Selection) map[string]string {
+	inputs := map[string]string{}
+	submitAdded := false
+	form.Find("input, textarea, select, button").Each(func(_ int, field *goquery.Selection) {
+		name := strings.TrimSpace(field.AttrOr("name", ""))
+		if name == "" || field.Is("[disabled]") {
+			return
+		}
+
+		tag := goquery.NodeName(field)
+		typ := strings.ToLower(field.AttrOr("type", ""))
+		switch tag {
+		case "input":
+			switch typ {
+			case "checkbox", "radio":
+				if !field.Is("[checked]") {
+					return
+				}
+				inputs[name] = field.AttrOr("value", "on")
+			case "submit":
+				if submitAdded {
+					return
+				}
+				submitAdded = true
+				inputs[name] = field.AttrOr("value", "")
+			case "button", "file", "image", "reset":
+				return
+			default:
+				inputs[name] = field.AttrOr("value", "")
+			}
+		case "textarea":
+			inputs[name] = field.Text()
+		case "select":
+			option := field.Find("option[selected]").First()
+			if option.Length() == 0 {
+				option = field.Find("option").First()
+			}
+			if option.Length() > 0 {
+				inputs[name] = option.AttrOr("value", option.Text())
+			}
+		case "button":
+			if typ != "" && typ != "submit" || submitAdded {
+				return
+			}
+			submitAdded = true
+			inputs[name] = field.AttrOr("value", field.Text())
+		}
+	})
+	return inputs
 }
 
 func loginNeedsPage(d *cardigann.Definition, spec cardigann.RequestSpec) bool {

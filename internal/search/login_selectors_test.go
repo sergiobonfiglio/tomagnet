@@ -18,7 +18,7 @@ func TestBuildLoginRequestResolvesSelectorKeysToInputNames(t *testing.T) {
 		},
 	}}}
 	html := `<html><body><form action="/takelogin"><input name="user_name" placeholder="Username"><input name="user_pass" placeholder="Password"></form></body></html>`
-	r := buildLoginRequest(d, html)
+	r := buildLoginRequest(d, html, "https://idx.test/login")
 	if r.Inputs["user_name"] != "u" || r.Inputs["user_pass"] != "p" {
 		t.Fatalf("got %#v", r)
 	}

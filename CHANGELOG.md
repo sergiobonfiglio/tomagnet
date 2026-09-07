@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fix form logins to resolve relative actions against the fetched page URL and submit hidden and submit-button fields.
+
 ## 0.3.9
 
 Patch release.

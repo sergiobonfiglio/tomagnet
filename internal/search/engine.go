@@ -379,7 +379,7 @@ func runOneBase(ctx context.Context, d *cardigann.Definition, idx config.Indexer
 				return nil, fmt.Errorf("login page: %w", err)
 			}
 			loginCookies = mergeCookies(loginCookies, pre.Cookies)
-			req = buildLoginRequest(d, string(pre.Body))
+			req = buildLoginRequest(d, string(pre.Body), pre.URL)
 			if req.Headers == nil {
 				req.Headers = map[string]string{}
 			}
