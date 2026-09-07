@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.3.11
+
+Patch release.
 
 - Resolve relative result links against the search response URL.
 - Run download `before` requests and refetch the original page before applying standard download selectors.
