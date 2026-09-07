@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	internalsearch "github.com/sergiobonfiglio/tomagnet/internal/search"
 )
 
 func TestSearchOptionsExposeIntentBasedQueryFields(t *testing.T) {
@@ -210,6 +212,21 @@ func TestSearchHonorsConcurrency(t *testing.T) {
 	releaseAll()
 	if response := <-completed; len(response.Errors) != 0 {
 		t.Fatalf("errors: %#v", response.Errors)
+	}
+}
+
+func TestAppendResultsIncludesEnrichmentError(t *testing.T) {
+	message := "download before path not found"
+	in := internalsearch.Response{Results: []internalsearch.Result{{
+		Indexer:         "demo",
+		EnrichmentError: &internalsearch.Error{Indexer: "demo", Stage: "enrichment", Message: message},
+	}}}
+	out := Response{}
+
+	appendResults(&out, in)
+
+	if len(out.Results) != 1 || out.Results[0].EnrichmentError == nil || out.Results[0].EnrichmentError.Message != message {
+		t.Fatalf("response = %#v", out)
 	}
 }
 

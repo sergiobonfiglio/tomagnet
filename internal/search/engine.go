@@ -46,6 +46,7 @@ type Options struct {
 	Categories         []string
 	Indexers           []config.Indexer
 	Limit, Concurrency int
+	DetailConcurrency  int
 	Definitions        map[string]*cardigann.Definition
 	Debug              func(string, ...any)
 }
@@ -76,6 +77,7 @@ func (o Options) cardigann() cardigann.SearchOptions {
 }
 
 type requester struct {
+	mu      sync.Mutex
 	delay   time.Duration
 	timeout time.Duration
 	debug   func(string, ...any)
@@ -194,6 +196,7 @@ func firstNonEmpty(vs ...string) string {
 }
 
 func (r *requester) Do(ctx context.Context, req fetch.Request) (fetch.Response, error) {
+	r.mu.Lock()
 	if r.now == nil {
 		r.now = time.Now
 	}
@@ -206,12 +209,17 @@ func (r *requester) Do(ctx context.Context, req fetch.Request) (fetch.Response, 
 	if r.delay > 0 && !r.last.IsZero() {
 		if wait := r.delay - r.now().Sub(r.last); wait > 0 {
 			if err := r.sleep(ctx, wait); err != nil {
+				r.mu.Unlock()
 				return fetch.Response{}, err
 			}
 		}
 	}
 	r.last = r.now()
-	return r.do(ctx, req, r.timeout, r.debug)
+	do := r.do
+	timeout := r.timeout
+	debug := r.debug
+	r.mu.Unlock()
+	return do(ctx, req, timeout, debug)
 }
 
 func Run(ctx context.Context, opt Options) Response {
@@ -418,14 +426,14 @@ func runOneBase(ctx context.Context, d *cardigann.Definition, idx config.Indexer
 	if err != nil {
 		return nil, fmt.Errorf("parse: %w", err)
 	}
-	rs = EnrichDetails(ctx, d, rs, func(ctx context.Context, req fetch.Request) ([]byte, string, error) {
+	rs = enrichDetails(ctx, d, rs, func(ctx context.Context, req fetch.Request) ([]byte, string, error) {
 		if req.FollowRedirect == nil {
 			fr := cardigann.FollowRedirect(d)
 			req.FollowRedirect = &fr
 		}
 		fr, err := rq.Do(ctx, req)
 		return fr.Body, fr.ContentType, err
-	})
+	}, opt.DetailConcurrency)
 	return rs, nil
 }
 

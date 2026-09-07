@@ -2,6 +2,8 @@ package search
 
 import (
 	"context"
+	"sort"
+	"sync"
 	"testing"
 	"time"
 
@@ -42,6 +44,51 @@ func TestRequesterHonorsRequestDelayBetweenCalls(t *testing.T) {
 	}
 	if len(slept) != 1 || slept[0] != 1500*time.Millisecond {
 		t.Fatalf("slept=%v", slept)
+	}
+}
+
+func TestRequesterSerializesConcurrentDelayScheduling(t *testing.T) {
+	const delay = 15 * time.Millisecond
+	var mu sync.Mutex
+	var starts []time.Time
+	r := requester{
+		delay: delay,
+		now:   time.Now,
+		sleep: func(ctx context.Context, duration time.Duration) error {
+			timer := time.NewTimer(duration)
+			defer timer.Stop()
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-timer.C:
+				return nil
+			}
+		},
+		do: func(ctx context.Context, req fetch.Request, timeout time.Duration, debug func(string, ...any)) (fetch.Response, error) {
+			mu.Lock()
+			starts = append(starts, time.Now())
+			mu.Unlock()
+			return fetch.Response{}, nil
+		},
+	}
+
+	var wg sync.WaitGroup
+	for range 3 {
+		wg.Go(func() {
+			if _, err := r.Do(context.Background(), fetch.Request{}); err != nil {
+				t.Errorf("Do() error = %v", err)
+			}
+		})
+	}
+	wg.Wait()
+	sort.Slice(starts, func(i, j int) bool { return starts[i].Before(starts[j]) })
+	if len(starts) != 3 {
+		t.Fatalf("starts = %d, want 3", len(starts))
+	}
+	for i := 1; i < len(starts); i++ {
+		if gap := starts[i].Sub(starts[i-1]); gap < delay-3*time.Millisecond {
+			t.Fatalf("request gap = %v, want at least %v", gap, delay-3*time.Millisecond)
+		}
 	}
 }
 

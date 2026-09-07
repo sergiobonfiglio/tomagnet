@@ -93,8 +93,8 @@ type TVQuery struct {
 // SearchOptions configures Search.
 //
 // Categories are passed to indexers that support category filtering. Limit is
-// applied per indexer. If Concurrency is zero or negative, Search uses the
-// internal default.
+// applied per indexer. If Concurrency or DetailConcurrency is zero or negative,
+// Search uses the corresponding internal default.
 type SearchOptions struct {
 	// Query is the high-level user intent to execute.
 	Query Query
@@ -108,6 +108,9 @@ type SearchOptions struct {
 	// Concurrency limits how many indexers may run at once. Zero or negative
 	// values use the internal default.
 	Concurrency int
+	// DetailConcurrency limits concurrent detail-page enrichment requests per
+	// indexer. Each result's request sequence remains ordered.
+	DetailConcurrency int
 	// Debug receives low-level debug log lines when non-nil.
 	Debug func(string, ...any)
 }
@@ -136,6 +139,9 @@ type Result struct {
 	InfoHash string
 	// DetailsURL is the details page URL when available.
 	DetailsURL string
+	// EnrichmentError describes why this result could not be resolved to a
+	// direct download. The partial result remains available.
+	EnrichmentError *Error
 }
 
 // Error describes a per-indexer failure.
@@ -222,6 +228,7 @@ func Search(ctx context.Context, opt SearchOptions) Response {
 			planned.Definitions = map[string]*cardigann.Definition{idx.ID: definition.cardigann()}
 			planned.Limit = opt.Limit
 			planned.Concurrency = 1
+			planned.DetailConcurrency = opt.DetailConcurrency
 			planned.Debug = opt.Debug
 			responses[i] = internalsearch.Run(ctx, planned)
 		})
@@ -264,6 +271,13 @@ func appendResults(out *Response, in internalsearch.Response) {
 			InfoHash:    value(res.InfoHash),
 			DetailsURL:  value(res.DetailsURL),
 		})
+		if res.EnrichmentError != nil {
+			out.Results[len(out.Results)-1].EnrichmentError = &Error{
+				Indexer: res.EnrichmentError.Indexer,
+				Stage:   res.EnrichmentError.Stage,
+				Message: res.EnrichmentError.Message,
+			}
+		}
 	}
 	for _, err := range in.Errors {
 		out.Errors = append(out.Errors, Error{Indexer: err.Indexer, Stage: err.Stage, Message: err.Message})

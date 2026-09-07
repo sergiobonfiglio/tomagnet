@@ -3,18 +3,19 @@ package search
 import "time"
 
 type Result struct {
-	Title       *string    `json:"title"`
-	Indexer     string     `json:"indexer"`
-	GUID        *string    `json:"guid"`
-	Size        *int64     `json:"size"`
-	Seeders     *int       `json:"seeders"`
-	Leechers    *int       `json:"leechers"`
-	PublishDate *time.Time `json:"publish_date"`
-	Category    *string    `json:"category"`
-	MagnetURL   *string    `json:"magnet_url"`
-	DownloadURL *string    `json:"download_url"`
-	InfoHash    *string    `json:"infohash"`
-	DetailsURL  *string    `json:"details_url"`
+	Title           *string    `json:"title"`
+	Indexer         string     `json:"indexer"`
+	GUID            *string    `json:"guid"`
+	Size            *int64     `json:"size"`
+	Seeders         *int       `json:"seeders"`
+	Leechers        *int       `json:"leechers"`
+	PublishDate     *time.Time `json:"publish_date"`
+	Category        *string    `json:"category"`
+	MagnetURL       *string    `json:"magnet_url"`
+	DownloadURL     *string    `json:"download_url"`
+	InfoHash        *string    `json:"infohash"`
+	DetailsURL      *string    `json:"details_url"`
+	EnrichmentError *Error     `json:"enrichment_error,omitempty"`
 }
 
 type Error struct {

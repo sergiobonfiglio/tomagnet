@@ -126,6 +126,9 @@ func main() {
         fmt.Printf("indexer %s failed: %s\n", err.Indexer, err.Message)
     }
     for _, result := range resp.Results {
+        if result.EnrichmentError != nil {
+            fmt.Printf("%s could not be resolved: %s\n", result.Title, result.EnrichmentError.Message)
+        }
         fmt.Printf("%s -> %s\n", result.Title, result.MagnetURL)
     }
 }
@@ -139,7 +142,8 @@ func main() {
 - `SearchOptions.Categories`: optional category filter passed to supporting indexers.
 - `SearchOptions.Indexers`: one or more indexers to query.
 - `SearchOptions.Limit`: per-indexer result limit.
-- `Response.Results`: normalized search hits.
+- `SearchOptions.DetailConcurrency`: maximum concurrent detail-enrichment chains per indexer; defaults to a bounded internal value.
+- `Response.Results`: normalized search hits. A partial result has `EnrichmentError` set when its direct download could not be resolved.
 - `Response.Errors`: per-indexer failures; one indexer can fail while others succeed.
 
 ### Definitions API

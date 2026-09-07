@@ -2,7 +2,11 @@ package search
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/sergiobonfiglio/tomagnet/internal/cardigann"
 	"github.com/sergiobonfiglio/tomagnet/internal/fetch"
@@ -117,6 +121,88 @@ func TestEnrichDetailsRefetchesDownloadPageAfterBeforeRequest(t *testing.T) {
 		t.Fatalf("detail requests = %d, want 2", detailRequests)
 	}
 	if got[0].MagnetURL == nil || *got[0].MagnetURL != "magnet:?xt=urn:btih:ABC123" {
+		t.Fatalf("unexpected: %#v", got[0])
+	}
+}
+
+func TestEnrichDetailsSkipsBeforeWhenPageAlreadyResolvesMagnet(t *testing.T) {
+	d := &cardigann.Definition{BaseURL: "https://idx.test", Config: map[string]string{}, Raw: map[string]any{"download": map[string]any{
+		"before":    map[string]any{"pathselector": map[string]any{"selector": "a.thanks", "attribute": "href"}},
+		"selectors": []any{map[string]any{"selector": `a[href^="magnet:"]`, "attribute": "href"}},
+	}}}
+	details := "https://idx.test/topic/1"
+	calls := 0
+	fetcher := func(ctx context.Context, req fetch.Request) ([]byte, string, error) {
+		calls++
+		if req.Path != details {
+			t.Fatalf("unexpected before request: %#v", req)
+		}
+		return []byte(`<a href="magnet:?xt=urn:btih:ABC"></a><a class="thanks" href="/thanks/1"></a>`), "text/html", nil
+	}
+
+	got := EnrichDetails(context.Background(), d, []Result{{Indexer: "idx", DetailsURL: &details, DownloadURL: &details}}, fetcher)
+	if calls != 1 {
+		t.Fatalf("calls = %d, want 1", calls)
+	}
+	if got[0].MagnetURL == nil || *got[0].MagnetURL != "magnet:?xt=urn:btih:ABC" {
+		t.Fatalf("unexpected: %#v", got[0])
+	}
+}
+
+func TestEnrichDetailsBoundsConcurrencyAndPreservesOrder(t *testing.T) {
+	d := &cardigann.Definition{BaseURL: "https://idx.test", Config: map[string]string{}, Raw: map[string]any{"details": map[string]any{
+		"fields": map[string]any{"magnet": map[string]any{"selector": "a", "attribute": "href"}},
+	}}}
+	results := make([]Result, 6)
+	for i := range results {
+		details := fmt.Sprintf("https://idx.test/topic/%d", i)
+		results[i] = Result{Indexer: "idx", DetailsURL: &details}
+	}
+	var inFlight, maximum atomic.Int32
+	fetcher := func(ctx context.Context, req fetch.Request) ([]byte, string, error) {
+		current := inFlight.Add(1)
+		defer inFlight.Add(-1)
+		for current > maximum.Load() && !maximum.CompareAndSwap(maximum.Load(), current) {
+		}
+		time.Sleep(20 * time.Millisecond)
+		return []byte(fmt.Sprintf(`<a href="magnet:?xt=urn:btih:%s"></a>`, req.Path)), "text/html", nil
+	}
+
+	got := enrichDetails(context.Background(), d, results, fetcher, 2)
+	if maximum.Load() != 2 {
+		t.Fatalf("maximum concurrency = %d, want 2", maximum.Load())
+	}
+	for i := range got {
+		want := fmt.Sprintf("magnet:?xt=urn:btih:https://idx.test/topic/%d", i)
+		if got[i].MagnetURL == nil || *got[i].MagnetURL != want {
+			t.Fatalf("result %d = %#v, want magnet %q", i, got[i], want)
+		}
+	}
+}
+
+func TestEnrichDetailsReportsFetchFailureOnResult(t *testing.T) {
+	d := &cardigann.Definition{BaseURL: "https://idx.test", Config: map[string]string{}, Raw: map[string]any{"download": map[string]any{
+		"selectors": []any{map[string]any{"selector": `a[href^="magnet:"]`, "attribute": "href"}},
+	}}}
+	details := "https://idx.test/topic/1"
+	got := EnrichDetails(context.Background(), d, []Result{{Indexer: "idx", DetailsURL: &details}}, func(context.Context, fetch.Request) ([]byte, string, error) {
+		return nil, "", errors.New("network unavailable")
+	})
+	if got[0].EnrichmentError == nil || got[0].EnrichmentError.Stage != "enrichment" || got[0].EnrichmentError.Message != "fetch details: network unavailable" {
+		t.Fatalf("unexpected: %#v", got[0])
+	}
+}
+
+func TestEnrichDetailsReportsMissingBeforePath(t *testing.T) {
+	d := &cardigann.Definition{BaseURL: "https://idx.test", Config: map[string]string{}, Raw: map[string]any{"download": map[string]any{
+		"before":    map[string]any{"pathselector": map[string]any{"selector": "a.thanks", "attribute": "href"}},
+		"selectors": []any{map[string]any{"selector": `a[href^="magnet:"]`, "attribute": "href"}},
+	}}}
+	details := "https://idx.test/topic/1"
+	got := EnrichDetails(context.Background(), d, []Result{{Indexer: "idx", DetailsURL: &details}}, func(context.Context, fetch.Request) ([]byte, string, error) {
+		return []byte(`<html></html>`), "text/html", nil
+	})
+	if got[0].EnrichmentError == nil || got[0].EnrichmentError.Message != "download before path not found" {
 		t.Fatalf("unexpected: %#v", got[0])
 	}
 }
