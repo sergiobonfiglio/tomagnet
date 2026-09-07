@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.3.12
+
+Patch release.
 
 - Enrich detail pages concurrently while preserving result order and definition request delays.
 - Skip download `before` requests when standard selectors already resolve a direct result.
