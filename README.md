@@ -6,7 +6,7 @@ It can fetch Cardigann/Jackett-style indexer definitions on demand, keep them in
 
 ## Version
 
-Current version: **0.3.12**
+Current version: **0.3.13**
 
 ```bash
 tomagnet --version

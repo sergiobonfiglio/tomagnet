@@ -10,14 +10,15 @@ import (
 )
 
 func TestBaseURLsAutoUsesCachedURLFirst(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	d := &cardigann.Definition{BaseURL: "https://primary.test", Raw: map[string]any{"links": []any{"https://primary.test", "https://mirror.test"}}}
+	d := &cardigann.Definition{BaseURL: "https://primary.test", Raw: map[string]any{"links": []any{"https://primary.test", "https://mirror.test", "https://cached.test"}}}
 	path := baseURLCachePath("idx")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, []byte("https://cached.test\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(baseURLCacheKey(d)+"\nhttps://cached.test\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -37,15 +38,17 @@ func TestBaseURLsAutoUsesCachedURLFirst(t *testing.T) {
 }
 
 func TestCacheBaseURLWritesUserCacheFile(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
-	cacheBaseURL("idx", "https://ok.test", func(string, ...any) {})
+	d := &cardigann.Definition{BaseURL: "https://ok.test"}
+	cacheBaseURL("idx", "https://ok.test", d, func(string, ...any) {})
 	b, err := os.ReadFile(baseURLCachePath("idx"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(b) != "https://ok.test\n" {
+	if string(b) != baseURLCacheKey(d)+"\nhttps://ok.test\n" {
 		t.Fatalf("got %q", string(b))
 	}
 }

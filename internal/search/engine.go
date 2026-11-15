@@ -3,9 +3,12 @@ package search
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -280,7 +283,7 @@ func runOne(ctx context.Context, idx config.Indexer, opt Options) ([]Result, err
 		dd.BaseURL = base
 		rs, err := runOneBase(ctx, &dd, idx, opt)
 		if err == nil && auto {
-			cacheBaseURL(idx.ID, base, opt.Debug)
+			cacheBaseURL(idx.ID, base, d, opt.Debug)
 		}
 		return rs, err
 	})
@@ -295,27 +298,38 @@ func baseURLs(idx config.Indexer, d *cardigann.Definition) ([]string, bool) {
 		return cardigann.BaseURLs(d, idx.BaseURL), false
 	}
 	bases := cardigann.BaseURLs(d, "")
-	if cached := cachedBaseURL(idx.ID); cached != "" {
+	if cached := cachedBaseURL(idx.ID, d); cached != "" {
 		bases = append([]string{cached}, bases...)
 	}
 	return uniqueStrings(bases), true
 }
 
-func cachedBaseURL(id string) string {
-	b, err := os.ReadFile(baseURLCachePath(id))
+func baseURLCacheKey(d *cardigann.Definition) string {
+	b, _ := json.Marshal([]any{d.BaseURL, d.Raw["links"], d.Raw["legacylinks"]})
+	return fmt.Sprintf("%x", sha256.Sum256(b))
+}
+
+func cachedBaseURL(id string, d *cardigann.Definition) string {
+	path := baseURLCachePath(id)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return ""
 	}
-	return strings.TrimSpace(string(b))
+	key, base, ok := strings.Cut(strings.TrimSpace(string(b)), "\n")
+	if !ok || key != baseURLCacheKey(d) {
+		_ = os.Remove(path)
+		return ""
+	}
+	return strings.TrimSpace(base)
 }
 
-func cacheBaseURL(id, base string, debug func(string, ...any)) {
+func cacheBaseURL(id, base string, d *cardigann.Definition, debug func(string, ...any)) {
 	path := baseURLCachePath(id)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		debug("cache base url mkdir %s: %v", id, err)
 		return
 	}
-	if err := os.WriteFile(path, []byte(strings.TrimSpace(base)+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(baseURLCacheKey(d)+"\n"+strings.TrimSpace(base)+"\n"), 0o644); err != nil {
 		debug("cache base url write %s: %v", id, err)
 	}
 }
@@ -419,6 +433,12 @@ func runOneBase(ctx context.Context, d *cardigann.Definition, idx config.Indexer
 	fr, err := rq.Do(ctx, fetch.Request{Method: spec.Method, Base: d.BaseURL, Path: spec.Path, Param: param, Query: queryValue(d, opt), Inputs: spec.Inputs, Headers: spec.Headers, FollowRedirect: &spec.FollowRedirect})
 	if err != nil {
 		return nil, fmt.Errorf("request: %w", err)
+	}
+	if fr.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("search response: unexpected HTTP status %d from %s", fr.StatusCode, fr.URL)
+	}
+	if len(bytes.TrimSpace(fr.Body)) == 0 {
+		return nil, fmt.Errorf("search response: empty body from %s", fr.URL)
 	}
 	parseDefinition := *d
 	parseDefinition.BaseURL = fr.URL

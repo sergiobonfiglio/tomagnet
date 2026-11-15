@@ -19,6 +19,7 @@ import (
 )
 
 type Response struct {
+	StatusCode       int
 	Body             []byte
 	ContentType, URL string
 	Cookies          map[string]string
@@ -130,7 +131,7 @@ func (s *Session) Do(ctx context.Context, spec Request) (Response, error) {
 	for _, c := range r.Cookies() {
 		cookies[c.Name] = c.Value
 	}
-	return Response{Body: b, ContentType: r.Header.Get("Content-Type"), URL: r.Request.URL.String(), Cookies: cookies}, nil
+	return Response{StatusCode: r.StatusCode, Body: b, ContentType: r.Header.Get("Content-Type"), URL: r.Request.URL.String(), Cookies: cookies}, nil
 }
 
 func buildURL(base, path string) (*url.URL, error) {

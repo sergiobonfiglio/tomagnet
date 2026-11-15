@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.13
+
+Patch release.
+
+- Invalidate cached mirror selections when active or legacy definition links change.
+- Reject non-200 and empty search responses so failed mirrors trigger fallback rather than reporting zero results.
+
 ## 0.3.12
 
 Patch release.
